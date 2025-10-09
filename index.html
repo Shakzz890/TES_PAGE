@@ -108,7 +108,7 @@
     </style>
 </head>
 <body>
-    <video id="player" autoplay="" playsinline=""></video>
+    <video id="player" autoplay="" muted="" playsinline=""></video>
     <div id="ui_elements">
         <div id="idle_animation" class="HIDDEN">
             <svg viewBox="0 0 24 24" fill="royalblue"><path d="M21,3H3C1.89,3,1,3.89,1,5V17C1,18.11,1.89,19,3,19H8V21H16V19H21C22.11,19,23,18.11,23,17V5C23,3.89,22.11,3,21,3M21,17H3V5H21V17M16,11L11,15V7L16,11Z"></path></svg>
@@ -385,19 +385,15 @@ function toggleFavourite() {
     saveFavoritesToStorage();
     renderChannelSettings();
     
-    // Rebuild the navigation to reflect the change
     const lastChannelKey = aFilteredChannelKeys[iCurrentChannel];
     buildNav();
 
-    // Find the channel again in the potentially new list
     const newIndex = aFilteredChannelKeys.indexOf(lastChannelKey);
     if (newIndex !== -1) {
         iCurrentChannel = newIndex;
     } else if (sSelectedGroup === '__fav' && aFilteredChannelKeys.length > 0) {
-        // If the channel was removed from favorites, select the first one
         iCurrentChannel = 0;
     } else if (aFilteredChannelKeys.length === 0) {
-        // If no channels left in the list
         player.unload();
         showIdleAnimation();
     }
@@ -412,9 +408,9 @@ function unmuteOnFirstUserAction() {
 async function initPlayer() {
     oLoader.classList.remove('HIDDEN');
     try {
-        oAvPlayer.muted = false; // Changed from true
+        oAvPlayer.muted = true;
         oAvPlayer.playsInline = true;
-        // oAvPlayer.setAttribute('muted',''); // This line can be removed or commented out
+        oAvPlayer.setAttribute('muted','');
         oAvPlayer.setAttribute('playsinline','');
     } catch(e){}
     await shaka.polyfill.installAll();
@@ -425,14 +421,14 @@ async function initPlayer() {
     }
     player = new shaka.Player(oAvPlayer);
     
-    /* UPDATED: SHAKA CONFIG */
+    /* UPDATED: Faster Loading Config */
     player.configure({
         abr: {
-            defaultBandwidthEstimate: 1000000, // Start with a more optimistic 1 Mbps
+            defaultBandwidthEstimate: 500000, 
         },
         streaming: {
-            rebufferingGoal: 5,  // Buffer 5s when rebuffering
-            bufferingGoal: 20, // Try to keep 20s of content ahead
+            rebufferingGoal: 2,
+            bufferingGoal: 8,
         }
     });
 
@@ -481,9 +477,6 @@ async function loadChannel(index) {
     const channelKey = aFilteredChannelKeys[iCurrentChannel];
     const channel = channels[channelKey];
     
-    /* DEBUGGING ADDED */
-    console.log(`Loading channel: Index=${index}, Key=${channelKey}, Name=${channel?.name}`);
-
     if (!player || !channel) {
         console.error("Player or channel object is missing.", player, channel);
         return;
@@ -793,7 +786,14 @@ document.addEventListener('keydown', (e) => {
         switch(e.key) {
             case 'ArrowLeft': showNav(); break;
             case 'ArrowRight': showChannelSettings(); break;
-            case 'Enter': showChannelName(); break;
+            /* UPDATED: Enter Key Toggle Logic */
+            case 'Enter':
+                if (oChannelInfo.classList.contains('visible')) {
+                    hideChannelName();
+                } else {
+                    showChannelName();
+                }
+                break;
             case 'ArrowUp': loadChannel(iCurrentChannel - 1); break;
             case 'ArrowDown': loadChannel(iCurrentChannel + 1); break;
             case 'h': showGuide(); break;
