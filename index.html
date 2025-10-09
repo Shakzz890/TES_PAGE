@@ -161,6 +161,44 @@ document.addEventListener('DOMContentLoaded', () => {
 /*******************************
  * Channels + Config
  *******************************/
+const channels = {
+    aniplus: { name: "Aniplus", type: "hls", manifestUri: "https://amg18481-amg18481c1-amgplt0352.playout.now3.amagi.tv/playlist/amg18481-amg18481c1-amgplt0352/playlist.m3u8", logo: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJj494OpI0bKrTrvcHqEkzMYzqtfLNdWjQrg&s" },
+    A2Z: { name: "A2Z", type: "hls", manifestUri: "https://corsproxy.io/?https://z2g2g7n2.stackpathcdn.com/live/ch22/playlist.m3u8", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/A2Z_Channel_11_logo.svg/250px-A2Z_Channel_11_logo.svg.png"}, /* CORS FIX & HLS TYPE ADDED */
+    ABC_AUSTRALIA: { name: "ABC AUSTRALIA", manifestUri: "https://abc-iview-mediapackagestreams-2.akamaized.net/out/v1/6e1ce2f5dbb44326a273c7c113459032/index.m3u8", logo: "https://i.imgur.com/Ddt3I7C.png"},
+    ALJAZEERA: { name: "ALJAZEERA", manifestUri: "https://live-hls-web-aja.getaj.net/AJA/01.m3u8", logo: "https://i.imgur.com/I392g9H.png"},
+    animalplanet: { name: "Animal Planet", type: "clearkey", manifestUri: "https://qp-pldt-live-bpk-01-prod.akamaized.net/bpk-tv/cg_animal_planet_sd/default/index.mpd", keyId: "436b69f987924fcbbc06d40a69c2799a", key: "c63d5b0d7e52335b61aeba4f6537d54d", logo: "https://i.imgur.com/SkpFpW4.png" },
+    animax: { name: "ANIMAX", manifestUri: "https://live-hls-web-aja.getaj.net/AJA/01.m3u8", logo: "https://i.imgur.com/vHq4c0J.png" },
+    ARIRANG: { name: "ARIRANG", manifestUri: "https://arirang.dms.llnwd.net/arirang/arirangtv_1/index.m3u8", logo: "https://i.imgur.com/kPwxo3x.png"},
+    AXN: { name: "AXN", manifestUri: "http://159.138.243.158/axn/axn.m3u8", logo: "https://i.imgur.com/9l33SGL.png"},
+    BBC_EARTH: { name: "BBC EARTH", manifestUri: "https://bcovlive-a.akamaihd.net/e2197262f3a2489d8176b63d2744155b/as-east-1/6232014856001/playlist.m3u8", logo: "https://i.imgur.com/X2WkTS0.png"},
+    BLOOMBERG: { name: "BLOOMBERG", manifestUri: "https://cdn-b-02.bltv.me/btv/live/master.m3u8", logo: "https://i.imgur.com/9Y1l1aX.png"},
+    discovery: { name: "Discovery Channel", type: "clearkey", manifestUri: "https://qp-pldt-live-bpk-02-prod.akamaized.net/bpk-tv/discovery/default/index.mpd", keyId: "d9ac48f5131641a789328257e778ad3a", key: "b6e67c37239901980c6e37e0607ceee6", logo: "https://i.imgur.com/XsvAk5H.png" },
+    nickelodeon: { name: "Nickelodeon", type: "clearkey", manifestUri: "https://qp-pldt-live-bpk-01-prod.akamaized.net/bpk-tv/dr_nickelodeon/default/index.mpd", keyId: "9ce58f37576b416381b6514a809bfd8b", key: "f0fbb758cdeeaddfa3eae538856b4d72", logo: "https://i.imgur.com/4o5dNZA.png" },
+    nickjr: { name: "Nick Jr", type: "clearkey", manifestUri: "https://qp-pldt-live-bpk-01-prod.akamaized.net/bpk-tv/dr_nickjr/default/index.mpd", keyId: "bab5c11178b646749fbae87962bf5113", key: "0ac679aad3b9d619ac39ad634ec76bc8", logo: "https://i.imgur.com/iIVYdZP.png" },
+    pbo: { name: "PBO", type: "clearkey", manifestUri: "https://qp-pldt-live-bpk-01-prod.akamaized.net/bpk-tv/pbo_sd/default/index.mpd", keyId: "dcbdaaa6662d4188bdf97f9f0ca5e830", key: "31e752b441bd2972f2b98a4b1bc1c7a1", logo: "https://i.imgur.com/550RYpJ.png" },
+    iqiyi: { name: "iQIYI", type: "clearkey", manifestUri: "https://linearjitp-playback.astro.com.my/dash-wv/linear/1006/default_ott.mpd", keyId: "7ef7e913ce85a1131b27036069169a10", key: "77d98ed71db7524c27875a09a975f9e6", logo: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSs3X1_D_GkWQbMiZzbmaoFets_gAeM6zKGhvtuAD7y46OH9zcqWCnLoG3K&s=10", userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36" },
+    tv5: { name: "TV 5 HD", type: "clearkey", manifestUri: "https://qp-pldt-live-bpk-02-prod.akamaized.net/bpk-tv/tv5_hd/default1/index.mpd", keyId: "2615129ef2c846a9bbd43a641c7303ef", key: "07c7f996b1734ea288641a68e1cfdc4d", logo: "https://vignette.wikia.nocookie.net/russel/images/f/f9/TV5_Logo_2011.png/revision/latest?cb=20161204035016" },
+    kapamilya: { name: "Kapamilya Channel HD", type: "clearkey", manifestUri: "https://d1uf7s78uqso1e.cloudfront.net/out/v1/efa01372657648be830e7c23ff68bea2/index.mpd", keyId: "bd17afb5dc9648a39be79ee3634dd4b8", key: "3ecf305d54a7729299b93a3d69c02ea5", logo: "https://cms.cignal.tv/Upload/Images/Kapamilya Channel Logo alpha.png" },
+};
+
+/* UPDATED EPG LIST: CORS fixes applied and dead links removed */
+const EPG_URLS = [
+    "https://raw.githubusercontent.com/AqFad2811/epg/main/epg.xml",
+    "https://raw.githubusercontent.com/AqFad2811/epg/main/unifitv.xml",
+    "https://raw.githubusercontent.com/AqFad2811/epg/main/astro.xml",
+    "https://raw.githubusercontent.com/azimabid00/epg/main/unifi_epg.xml",
+    "https://i.mjh.nz/PlutoTV/all.xml",
+    "https://raw.githubusercontent.com/azimabid00/epg/main/astro_epg.xml",
+    "https://azimabid00.github.io/epg/astro_epg.xml",
+    "https://corsproxy.io/?https://epgshare01.online/epgshare01/epg_ripper_PH1.xml.gz",
+    "https://corsproxy.io/?https://epgshare01.online/epgshare01/epg_ripper_PH2.xml.gz",
+    "https://corsproxy.io/?https://epgshare01.online/epgshare01/epg_ripper_ID1.xml.gz",
+    "https://corsproxy.io/?https://epgshare01.online/epgshare01/epg_ripper_MY1.xml.gz",
+    "https://corsproxy.io/?https://epgshare01.online/epgshare01/epg_ripper_HK1.xml.gz",
+    "https://corsproxy.io/?https://epgshare01.online/epgshare01/epg_ripper_US1.xml.gz",
+    "https://raw.githubusercontent.com/atone77721/CIGNAL_EPG/refs/heads/main/cignal_epg.xml",
+    "https://raw.githubusercontent.com/atone77721/CIGNAL_EPG/refs/heads/main/sky_epg.xml"
+];
 
 const i18n = {
     en: {
