@@ -3,7 +3,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Shakzz TV Player - Fixed</title>
     <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.7.13/dist/shaka-player.ui.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js" integrity="sha512-+ZqvG9mQb2s4n3nA3KxTzF7k5b2Qazt+g0uO6k1yOJ8l4f5Qv2Kx0eQ9c2nJ8iU9K3q6mXq8bG4Y0G1m5Y5w4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js" integrity="sha512-+ZqvG9mQb2s4n3nA3KxTzF7k5b2Qazt+g0uO6k1yOJ8l4f6f5Qv2Kx0eQ9c2nJ8iU9K3q6mXq8bG4Y0G1m5Y5w4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         * { font-family: Lucida Sans, Arial, Helvetica, sans-serif; outline: none; }
         body {
@@ -74,16 +74,16 @@
         /* --- UPDATED: Idle Screen Branding --- */
         #idle_animation {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2;
-            display: block; /* Changed from flex */
-            position: relative;
+            display: flex; /* Changed from block to flex for vertical centering */
+            justify-content: flex-end; /* Align to the right */
+            align-items: center; /* Vertically center the branding */
             background-image: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://static0.gamerantimages.com/wordpress/wp-content/uploads/2025/04/sung-jinwoo-solo-leveling.jpg?w=1600&h=900&fit=crop');
             background-size: cover;
             background-position: center;
         }
         .idle-branding {
-            position: absolute;
-            top: 40px;
-            right: 40px;
+            position: relative; /* Changed from absolute to relative to align within flex container */
+            padding-right: 40px; /* Spacing from the right edge */
             text-align: right;
             color: white;
             text-shadow: 3px 3px 8px rgba(0,0,0,0.9);
