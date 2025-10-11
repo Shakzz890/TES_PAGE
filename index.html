@@ -4,18 +4,20 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Shakzz TV Player - Fixed</title>
-    
+     <script src="https://ssl.p.jwpcdn.com/player/v/8.36.6/jwplayer.js"></script>
+    <script>jwplayer.key = "ITWMv7t88JGzI0xPwW8I0+LveiXX9SWbfdmt0ArUSyc=";</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="style.css">
     
-    <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.7.13/dist/shaka-player.ui.js"></script>
+    <script src="https://cdn.jwplayer.com/libraries/YOUR_JWPLAYER_KEY.js"></script>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js" integrity="sha512-+ZqvG9mQb2s4n3nA3KxTzF7k5b2Qazt+g0uO6k1yOJ8l4f6f5Qv2Kx0eQ9c2nJ8iU9K3q6mXq8bG4Y0G1m5Y5w4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
-    <video id="player" autoplay muted playsinline></video>
+    <div id="player"></div>
     
     <div id="ui_elements">
         <div id="idle_animation">
@@ -29,57 +31,9 @@
         </div>
 
         <nav id="nav">
-            <div id="brand-header">
-                <svg viewBox="0 0 24 24" fill="white"><path d="M21,3H3C1.89,3,1,3.89,1,5V17C1,18.11,1.89,19,3,19H8V21H16V19H21C22.11,19,23,18.11,23,17V5C23,3.89,22.11,3,21,3M21,17H3V5H21V17M16,11L11,15V7L16,11Z"></path></svg>
-                <span>Shakzz TV</span>
-            </div>
-            <div id="search_item_wrapper">
-                <input id="search_field" type="search" placeholder="Search">
-            </div>
-            <div id="list_container_scrollarea" style="height: calc(100% - 95px - 64px);">
-                <div id="list_container">
-                    <div id="group_list" class="custom-scrollbar">
-                        <ul id="main_nav">
-                            <li id="epg_group" data-langid="epg_menu"></li>
-                            <li id="guide_group" data-langid="guide_menu"></li>
-                        </ul>
-                        <div class="HR" style="margin:16px 6px; height:1px; background: linear-gradient(to right, rgba(0,0,0,0), rgba(65, 105, 225, 0.75), rgba(0,0,0,0));"></div>
-                        <h2 class="list_headline i18n" data-langid="groups"></h2>
-                        <ul id="dynamic_groups_list">
-                            <li id="favourites_group" data-group="__fav" data-langid="favourites"></li>
-                            <li id="all_channels_group" data-group="__all" data-langid="allChannels"></li>
-                        </ul>
-                    </div>
-                    <div id="channel_list" class="custom-scrollbar fade-in"></div>
-                </div>
-            </div>
-        </nav>
+            </nav>
 
-        <div id="channel_settings">
-            <div id="list_container_right_scrollarea">
-                <div id="stream-info" class="HIDDEN"></div>
-                <h2 class="list_headline i18n" data-langid="channelSettings"></h2>
-                <ul id="channel_settings_list"></ul>
-            </div>
         </div>
-
-        <div id="channel_info">
-            <div id="ch_logo"></div>
-            <div id="channel_text_container">
-                <div id="channel_name"></div>
-                <div id="channel_epg"></div>
-            </div>
-        </div>
-
-        <div id="guide" class="fullscreen" aria-hidden="true">
-            <div class="fullscreen-popup">
-                <div class="close-button" onclick="hideGuide()"></div>
-                <div id="guide_content"></div>
-            </div>
-        </div>
-        
-        <div id="loader" class="fullscreen HIDDEN"><div id="spinner"></div></div>
-    </div>
 
     <script src="script.js"></script>
 </body>
