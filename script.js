@@ -553,3 +553,56 @@ function updateSelectedChannelInNav() {
 Array.from(document.querySelectorAll('#group_list li')).forEach(li => li.addEventListener('click', (e) => selectGroupListItem(e.currentTarget)));
 
 }); // DOMContentLoaded end
+document.addEventListener("DOMContentLoaded", function () {
+    const playOverlay = document.getElementById("play_button_overlay");
+
+    // ✅ Make sure overlay is always above the player
+    playOverlay.style.zIndex = "9999";
+    playOverlay.style.cursor = "pointer";
+
+    // ✅ Setup JWPlayer
+    const player = jwplayer("player").setup({
+        file: "https://your-aniplus-stream-url.m3u8", // replace with your Aniplus URL
+        autostart: false,
+        mute: true,
+        width: "100%",
+        height: "100%",
+        stretching: "uniform"
+    });
+
+    // 🧠 Allow click/tap/remote to start playback
+    ["click", "touchstart", "keydown"].forEach(evt => {
+        playOverlay.addEventListener(evt, e => {
+            if (evt === "keydown" && e.key !== "Enter") return;
+            e.preventDefault();
+
+            playOverlay.style.display = "none"; // hide overlay
+            player.play(true);
+            player.setMute(false);
+        });
+    });
+
+    // 🎮 Keyboard navigation (Space = pause/play, M = mute/unmute)
+    document.addEventListener("keydown", e => {
+        switch (e.key) {
+            case " ":
+                e.preventDefault();
+                if (player.getState() === "playing") player.pause();
+                else player.play(true);
+                break;
+            case "m":
+            case "M":
+                player.setMute(!player.getMute());
+                break;
+            case "Enter":
+                if (playOverlay.style.display !== "none") playOverlay.click();
+                break;
+        }
+    });
+
+    // 🧩 Optional: Autoplay Aniplus after short delay
+    setTimeout(() => {
+        player.play(true).catch(err => console.warn("Autoplay blocked, waiting for interaction"));
+    }, 1000);
+});
+
