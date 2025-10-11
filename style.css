@@ -347,19 +347,9 @@ h3.list_headline {
 
 /* --- UPDATED: Idle Screen Branding --- */
 #idle_animation {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 2;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    background-image: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://i.imgur.com/gKjG1sR.jpeg');
-    background-size: cover;
-    background-position: center;
-    transition: transform 0.5s ease, filter 0.5s ease;
+    /* ... other styles ... */
+    background-image: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)), url('https://images.hdqwalls.com/download/dark-blue-purple-mountains-4k-i8-1920x1080.jpg');
+    /* ... other styles ... */
 }
 
 .idle-branding {
