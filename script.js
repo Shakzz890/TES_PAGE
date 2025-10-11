@@ -84,7 +84,6 @@ function normalizeForMatch(s) {
 /*******************************
  * EPG fetch & parse
  *******************************/
-// ... (This whole section is unchanged) ...
 async function fetchTextOrGz(url){try{const res=await fetch(url);if(!res.ok)throw new Error('bad response '+res.status);const contentType=res.headers.get('content-type')||'';if(contentType.includes('xml')||contentType.includes('text')||contentType.includes('charset')){return await res.text()}
 const buf=await res.arrayBuffer();try{const text=(new TextDecoder('utf-8',{fatal:false})).decode(buf);if(text.trim().startsWith('<'))return text}catch(e){}
 try{const u8=new Uint8Array(buf);const inflated=pako.ungzip(u8);return(new TextDecoder).decode(inflated)}catch(e){console.warn('gzip decode failed for',url,e);return(new TextDecoder).decode(buf)}}catch(err){console.warn('Failed to fetch EPG url:',url,err);return null}}
@@ -129,7 +128,6 @@ function toggleFavourite() {
     updateSelectedChannelInNav();
 }
 
-// --- FIX START: Simplified function for first user action ---
 let isFirstActionDone = false;
 function onFirstUserAction() {
     if (isFirstActionDone) return;
@@ -138,7 +136,6 @@ function onFirstUserAction() {
     try { oAvPlayer.muted = false; } catch (e) {}
     if (oIdleAnimation) oIdleAnimation.classList.add('HIDDEN');
 }
-// --- FIX END ---
 
 async function initPlayer() {
     try {
@@ -174,6 +171,10 @@ async function initPlayer() {
         showIdleAnimation();
     });
     player.addEventListener('adaptation', updateStreamInfo);
+    
+    // --- NEW: Set up the mouse-clickable playback controls ---
+    setupPlaybackControls();
+
     let i = 1;
     for (const key in channels) {
         channels[key].number = i++;
@@ -186,6 +187,56 @@ async function initPlayer() {
 
 function playlistReadyHandler() {
     buildNav();
+}
+
+// --- NEW: Playback Controls ---
+function setupPlaybackControls() {
+    const ICONS = {
+        play: '<svg viewBox="0 0 24 24"><path d="M8,5.14V19.14L19,12.14L8,5.14Z" /></svg>',
+        pause: '<svg viewBox="0 0 24 24"><path d="M14,19H18V5H14M6,19H10V5H6V19Z" /></svg>',
+        volumeHigh: '<svg viewBox="0 0 24 24"><path d="M14,3.23V5.29C16.89,6.15 19,8.83 19,12C19,15.17 16.89,17.84 14,18.7V20.77C18,19.86 21,16.28 21,12C21,7.72 18,4.14 14,3.23M16.5,12C16.5,10.23 15.5,8.71 14,7.97V16C15.5,15.29 16.5,13.76 16.5,12M3,9V15H7L12,20V4L7,9H3Z" /></svg>',
+        volumeMuted: '<svg viewBox="0 0 24 24"><path d="M12,4L7,9H3V15H7L12,20V4M21.2,12A6.5,6.5 0 0,1 19,15.18L17.59,13.77A4.5,4.5 0 0,0 19,12A4.5,4.5 0 0,0 17.59,10.23L19,8.82A6.5,6.5 0 0,1 21.2,12M14,3.23V5.29L16.42,7.71L16.42,7.71A2.5,2.5 0 0,1 16.5,12A2.5,2.5 0 0,1 14,14.72V16.71A4.5,4.5 0 0,0 16.42,16.29L19.23,19.1L20.64,17.69L3.36,4.41L1.95,5.82L14,17.87V20.77C18,19.86 21,16.28 21,12A6.4,6.4 0 0,0 20.25,9.85L19.12,8.72L14,3.23Z" /></svg>',
+    };
+
+    const video = oAvPlayer;
+    const playPauseBtn = getEl('play_pause_button');
+    const muteUnmuteBtn = getEl('mute_unmute_button');
+    const volumeSlider = getEl('volume_slider');
+
+    function updatePlayPauseIcon() {
+        if (playPauseBtn) playPauseBtn.innerHTML = video.paused ? ICONS.play : ICONS.pause;
+    }
+    function updateMuteIcon() {
+        if (muteUnmuteBtn) muteUnmuteBtn.innerHTML = video.muted || video.volume === 0 ? ICONS.volumeMuted : ICONS.volumeHigh;
+    }
+
+    if(playPauseBtn) playPauseBtn.addEventListener('click', () => {
+        if (video.paused) {
+            video.play();
+        } else {
+            video.pause();
+        }
+    });
+
+    if(muteUnmuteBtn) muteUnmuteBtn.addEventListener('click', () => {
+        video.muted = !video.muted;
+    });
+
+    if(volumeSlider) volumeSlider.addEventListener('input', (e) => {
+        video.volume = e.target.value;
+        video.muted = e.target.value == 0;
+    });
+    
+    video.addEventListener('play', updatePlayPauseIcon);
+    video.addEventListener('pause', updatePlayPauseIcon);
+    video.addEventListener('volumechange', () => {
+        if (volumeSlider) volumeSlider.value = video.volume;
+        updateMuteIcon();
+    });
+
+    // Set initial state
+    updatePlayPauseIcon();
+    updateMuteIcon();
 }
 
 function updateSelectedChannelInNav() {
@@ -231,7 +282,7 @@ async function loadChannel(index) {
     }
     try {
         await player.load(channel.manifestUri);
-        hideIdleAnimation();
+        // We don't hide the idle animation here; that happens on first user action.
         try { await oAvPlayer.play(); } catch (playErr) { console.warn('Autoplay prevented:', playErr); }
     } catch (error) {
         console.error(`Error loading channel: ${channel.name}`, error);
@@ -267,6 +318,7 @@ function buildNav() {
             item.className = 'channel-item';
             item.dataset.key = key;
             item.onclick = () => {
+                onFirstUserAction(); // Ensure player is unmuted if user clicks a channel first
                 preventAutoPlay = false;
                 loadChannel(index);
                 setTimeout(hideNav, 100);
@@ -317,8 +369,6 @@ function buildNav() {
         }
     }, 150);
 }
-
-// ... (Rest of the UI functions are unchanged) ...
 function renderChannelSettings(){oChannelSettingsList.innerHTML='';if(aFilteredChannelKeys.length===0)return;const currentKey=aFilteredChannelKeys[iCurrentChannel];const channel=channels[currentKey];channelSettingsOptions.forEach((opt,index)=>{const item=document.createElement('li');item.id=opt.id;let text=getLang(opt.langid);if(opt.id==='channel-setting-favourite'){text=channel&&channel.favorite?'Remove from Favourites':'Add to Favorites'}
 item.textContent=text;if(index===iChannelSettingsIndex)item.classList.add('selected');oChannelSettingsList.appendChild(item)})}
 function updateStreamInfo(){if(!player)return;const activeTrack=player.getVariantTracks().find(t=>t.active);if(activeTrack){oStreamInfo.innerHTML=`codecs: ${activeTrack.videoCodec||activeTrack.audioCodec}<br>resolution: ${activeTrack.width}x${activeTrack.height}<br>bitrate: ${(activeTrack.bandwidth/1000000).toFixed(3)} Mbit/s`}else{oStreamInfo.innerHTML='Getting stream info...'}}
@@ -364,19 +414,14 @@ document.addEventListener('touchstart', handleTouchStart, false);
 document.addEventListener('touchmove', handleTouchMove, false);
 document.addEventListener('touchend', handleTouchEnd, false);
 
-// --- FIX START: Dedicated listeners for the play button ---
 const oPlayButton = getEl("play_button_overlay");
 if (oPlayButton) {
     oPlayButton.addEventListener('click', onFirstUserAction);
-    
-    // Add touch listener for mobile devices
     oPlayButton.addEventListener('touchstart', (e) => {
-        e.preventDefault(); // Prevents the browser from firing a 'click' event after the touch
+        e.preventDefault();
         onFirstUserAction();
     });
 }
-// --- FIX END ---
-
 
 (function initDefaults() {
     const allGroup = document.getElementById('all_channels_group');
