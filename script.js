@@ -43,6 +43,9 @@ const channelSettingsOptions = [
 let player, iCurrentChannel = 0, aFilteredChannelKeys = [], sSelectedGroup = '__all', bNavOpened = false, bGroupsOpened = false, bGuideOpened = false, bChannelSettingsOpened = false, iChannelSettingsIndex = 0, channelNameTimeout;
 let preventAutoPlay = false;
 let touchStartX = 0, touchStartY = 0, touchEndX = 0, touchEndY = 0;
+// --- FIX START: Add a flag to track the initial load for autoplay ---
+let isInitialLoad = true;
+// --- FIX END ---
 
 const EPG_INDEX = { byId: {}, byName: {} };
 
@@ -301,15 +304,12 @@ async function initPlayer() {
     playlistReadyHandler();
     loadAllEpg().catch(err => console.warn('EPG load failed', err));
 }
+// --- FIX START: Simplify this handler, the main logic is moved to buildNav ---
 function playlistReadyHandler() {
     buildNav();
-    if (aFilteredChannelKeys.length > 0 && !preventAutoPlay) {
-        iCurrentChannel = 0;
-        try { loadChannel(0); } catch(e){ console.warn('autoplay loadChannel error', e); }
-    } else {
-        showIdleAnimation();
-    }
+    // The initial load call is now triggered inside buildNav to avoid the race condition.
 }
+// --- FIX END ---
 function updateSelectedChannelInNav() {
     if (!oChannelList) return;
     const currentSelected = oChannelList.querySelector('.selected');
@@ -422,6 +422,23 @@ function buildNav() {
         oChannelList.appendChild(fragment);
 
         updateSelectedChannelInNav();
+
+        // --- FIX START: Trigger autoplay from here, AFTER the channel list is built ---
+        if (isInitialLoad && aFilteredChannelKeys.length > 0) {
+            isInitialLoad = false; // Ensure this only runs once
+            iCurrentChannel = 0;
+            try {
+                loadChannel(0);
+            } catch (e) {
+                console.warn('Initial autoplay loadChannel error', e);
+                showIdleAnimation();
+            }
+        } else if (isInitialLoad) {
+            // If it's the first load but no channels were found
+            isInitialLoad = false;
+            showIdleAnimation();
+        }
+        // --- FIX END ---
     }, 150);
 }
 function renderChannelSettings() {
@@ -718,11 +735,11 @@ function handleTouchEnd(e) {
         // Allow native vertical scroll, but handle horizontal swipes
         if (absDeltaX > absDeltaY && absDeltaX > swipeThreshold) {
              if (deltaX > 0) { // Swipe Right
-                if (bGroupsOpened) { /* Do nothing, allow scroll */ }
-             } else { // Swipe Left
-                if (!bGroupsOpened) { hideGroups(); }
-                else { hideNav(); }
-             }
+                 if (bGroupsOpened) { /* Do nothing, allow scroll */ }
+            } else { // Swipe Left
+                 if (!bGroupsOpened) { hideGroups(); }
+                 else { hideNav(); }
+            }
         }
     }
     // Main interaction logic for tap/swipe
