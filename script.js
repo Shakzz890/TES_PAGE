@@ -81,153 +81,28 @@ function normalizeForMatch(s) {
     return s.toString().toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-// ... (Epg functions remain the same) ...
-async function fetchTextOrGz(url) {
-    try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('bad response ' + res.status);
-        const contentType = res.headers.get('content-type') || '';
-        if (contentType.includes('xml') || contentType.includes('text') || contentType.includes('charset')) {
-            return await res.text();
-        }
-        const buf = await res.arrayBuffer();
-        try {
-            const text = new TextDecoder('utf-8', {fatal:false}).decode(buf);
-            if (text.trim().startsWith('<')) return text;
-        } catch (e) {}
-        try {
-            const u8 = new Uint8Array(buf);
-            const inflated = pako.ungzip(u8);
-            return new TextDecoder().decode(inflated);
-        } catch (e) {
-            console.warn('gzip decode failed for', url, e);
-            return new TextDecoder().decode(buf);
-        }
-    } catch (err) {
-        console.warn('Failed to fetch EPG url:', url, err);
-        return null;
-    }
-}
-function parseXmlStringToDoc(xmlStr) {
-    try {
-        return new DOMParser().parseFromString(xmlStr, "application/xml");
-    } catch (e) { console.warn('XML parse error', e); return null; }
-}
-function parseXmltvTime(str) {
-    if (!str) return null;
-    const m = str.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
-    if (!m) return new Date(str);
-    const [_, y, mo, d, hh, mm, ss] = m;
-    return new Date(Date.UTC(+y, +mo-1, +d, +hh, +mm, +ss));
-}
-function storeProgramme(channelKey, prog) {
-    if (!channelKey) return;
-    if (!EPG_INDEX.byId[channelKey]) EPG_INDEX.byId[channelKey] = [];
-    EPG_INDEX.byId[channelKey].push(prog);
-}
-function indexByDisplayName(name, prog) {
-    if (!name) return;
-    const key = normalizeForMatch(name);
-    if (!EPG_INDEX.byName[key]) EPG_INDEX.byName[key] = [];
-    EPG_INDEX.byName[key].push(prog);
-}
-async function loadAllEpg() {
-    const promises = EPG_URLS.map(async (u) => {
-        const xmlText = await fetchTextOrGz(u);
-        if (!xmlText) return;
-        const doc = parseXmlStringToDoc(xmlText);
-        if (!doc) return;
-        doc.querySelectorAll('channel').forEach(chNode => {
-            const id = chNode.getAttribute('id') || chNode.getAttribute('tvg-id') || null;
-            const names = Array.from(chNode.querySelectorAll('display-name')).map(n => n.textContent).filter(Boolean);
-            if (id) {
-                names.forEach(n => indexByDisplayName(n, { channelId: id, displayName: n, from: u }));
-            } else {
-                names.forEach(n => indexByDisplayName(n, { channelId: null, displayName: n, from: u }));
-            }
-        });
-        doc.querySelectorAll('programme').forEach(pn => {
-            const ch = pn.getAttribute('channel') || pn.getAttribute('channelid') || pn.getAttribute('tvg-id') || null;
-            const start = parseXmltvTime(pn.getAttribute('start') || pn.getAttribute('begin') || pn.getAttribute('date'));
-            const stop = parseXmltvTime(pn.getAttribute('stop') || pn.getAttribute('end'));
-            const titleNode = pn.querySelector('title');
-            const subNode = pn.querySelector('sub-title') || pn.querySelector('desc') || pn.querySelector('description');
-            const title = titleNode ? titleNode.textContent.trim() : (pn.getAttribute('title') || '');
-            const sub = subNode ? subNode.textContent.trim() : '';
-            const prog = { start, stop, title, sub, rawNode: pn };
-            if (ch) storeProgramme(ch, prog);
-            const dn = pn.querySelector('display-name');
-            if (dn) indexByDisplayName(dn.textContent, prog);
-        });
-    });
-    await Promise.all(promises);
-    for (const id in EPG_INDEX.byId) {
-        EPG_INDEX.byId[id].sort((a,b) => (a.start?.getTime()||0) - (b.start?.getTime()||0));
-    }
-    for (const nm in EPG_INDEX.byName) {
-        EPG_INDEX.byName[nm].sort((a,b) => (a.start?.getTime()||0) - (b.start?.getTime()||0));
-    }
-    console.info('EPG loaded: ids:', Object.keys(EPG_INDEX.byId).length, 'names:', Object.keys(EPG_INDEX.byName).length);
-}
-function findEpgForChannel(channelObj) {
-    if (channelObj.tvgId && EPG_INDEX.byId[channelObj.tvgId]) {
-        return EPG_INDEX.byId[channelObj.tvgId];
-    }
-    if (channelObj.key && EPG_INDEX.byId[channelObj.key]) {
-        return EPG_INDEX.byId[channelObj.key];
-    }
-    const n = normalizeForMatch(channelObj.name);
-    if (n && EPG_INDEX.byName[n]) {
-        const arr = EPG_INDEX.byName[n];
-        const progs = [];
-        arr.forEach(item => {
-            if (item.channelId && EPG_INDEX.byId[item.channelId]) {
-                EPG_INDEX.byId[item.channelId].forEach(p => progs.push(p));
-            } else if (item.title) {
-                progs.push(item);
-            }
-        });
-        if (progs.length) return progs.sort((a,b)=> (a.start?.getTime()||0)-(b.start?.getTime()||0));
-    }
-    for (const nameKey in EPG_INDEX.byName) {
-        if (!n) continue;
-        if (nameKey.includes(n) || n.includes(nameKey) || nameKey.startsWith(n) || n.startsWith(nameKey)) {
-            const arr = EPG_INDEX.byName[nameKey];
-            const progs = [];
-            arr.forEach(item => {
-                if (item.channelId && EPG_INDEX.byId[item.channelId]) {
-                    EPG_INDEX.byId[item.channelId].forEach(p => progs.push(p));
-                } else if (item.title) {
-                    progs.push(item);
-                }
-            });
-            if (progs.length) return progs.sort((a,b)=> (a.start?.getTime()||0)-(b.start?.getTime()||0));
-        }
-    }
-    return null;
-}
-function getNowAndNextFromProgList(progs) {
-    if (!progs || progs.length === 0) return { now: null, next: null };
-    const nowTime = Date.now();
-    let nowProg = null;
-    let nextProg = null;
-    for (let i=0;i<progs.length;i++) {
-        const p = progs[i];
-        const s = p.start ? p.start.getTime() : null;
-        const e = p.stop ? p.stop.getTime() : null;
-        if (s && e && nowTime >= s && nowTime < e) {
-            nowProg = p;
-            nextProg = progs[i+1] || null;
-            break;
-        }
-        if (s && nowTime < s) {
-            nextProg = p;
-            break;
-        }
-    }
-    return { now: nowProg, next: nextProg };
-}
-
+/*******************************
+ * EPG fetch & parse
+ *******************************/
+// ... (This whole section is unchanged) ...
+async function fetchTextOrGz(url){try{const res=await fetch(url);if(!res.ok)throw new Error('bad response '+res.status);const contentType=res.headers.get('content-type')||'';if(contentType.includes('xml')||contentType.includes('text')||contentType.includes('charset')){return await res.text()}
+const buf=await res.arrayBuffer();try{const text=(new TextDecoder('utf-8',{fatal:false})).decode(buf);if(text.trim().startsWith('<'))return text}catch(e){}
+try{const u8=new Uint8Array(buf);const inflated=pako.ungzip(u8);return(new TextDecoder).decode(inflated)}catch(e){console.warn('gzip decode failed for',url,e);return(new TextDecoder).decode(buf)}}catch(err){console.warn('Failed to fetch EPG url:',url,err);return null}}
+function parseXmlStringToDoc(xmlStr){try{return(new DOMParser).parseFromString(xmlStr,"application/xml")}catch(e){console.warn('XML parse error',e);return null}}
+function parseXmltvTime(str){if(!str)return null;const m=str.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);if(!m)return new Date(str);const[_,y,mo,d,hh,mm,ss]=m;return new Date(Date.UTC(+y,+mo-1,+d,+hh,+mm,+ss))}
+function storeProgramme(channelKey,prog){if(!channelKey)return;if(!EPG_INDEX.byId[channelKey])EPG_INDEX.byId[channelKey]=[];EPG_INDEX.byId[channelKey].push(prog)}
+function indexByDisplayName(name,prog){if(!name)return;const key=normalizeForMatch(name);if(!EPG_INDEX.byName[key])EPG_INDEX.byName[key]=[];EPG_INDEX.byName[key].push(prog)}
+async function loadAllEpg(){const promises=EPG_URLS.map(async(u)=>{const xmlText=await fetchTextOrGz(u);if(!xmlText)return;const doc=parseXmlStringToDoc(xmlText);if(!doc)return;doc.querySelectorAll('channel').forEach(chNode=>{const id=chNode.getAttribute('id')||chNode.getAttribute('tvg-id')||null;const names=Array.from(chNode.querySelectorAll('display-name')).map(n=>n.textContent).filter(Boolean);if(id){names.forEach(n=>indexByDisplayName(n,{channelId:id,displayName:n,from:u}))}else{names.forEach(n=>indexByDisplayName(n,{channelId:null,displayName:n,from:u}))}});doc.querySelectorAll('programme').forEach(pn=>{const ch=pn.getAttribute('channel')||pn.getAttribute('channelid')||pn.getAttribute('tvg-id')||null;const start=parseXmltvTime(pn.getAttribute('start')||pn.getAttribute('begin')||pn.getAttribute('date'));const stop=parseXmltvTime(pn.getAttribute('stop')||pn.getAttribute('end'));const titleNode=pn.querySelector('title');const subNode=pn.querySelector('sub-title')||pn.querySelector('desc')||pn.querySelector('description');const title=titleNode?titleNode.textContent.trim():(pn.getAttribute('title')||'');const sub=subNode?subNode.textContent.trim():'';const prog={start,stop,title,sub,rawNode:pn};if(ch)storeProgramme(ch,prog);const dn=pn.querySelector('display-name');if(dn)indexByDisplayName(dn.textContent,prog)})});await Promise.all(promises);for(const id in EPG_INDEX.byId){EPG_INDEX.byId[id].sort((a,b)=>(a.start?.getTime()||0)-(b.start?.getTime()||0))}
+for(const nm in EPG_INDEX.byName){EPG_INDEX.byName[nm].sort((a,b)=>(a.start?.getTime()||0)-(b.start?.getTime()||0))}
+console.info('EPG loaded: ids:',Object.keys(EPG_INDEX.byId).length,'names:',Object.keys(EPG_INDEX.byName).length)}
+function findEpgForChannel(channelObj){if(channelObj.tvgId&&EPG_INDEX.byId[channelObj.tvgId]){return EPG_INDEX.byId[channelObj.tvgId]}
+if(channelObj.key&&EPG_INDEX.byId[channelObj.key]){return EPG_INDEX.byId[channelObj.key]}
+const n=normalizeForMatch(channelObj.name);if(n&&EPG_INDEX.byName[n]){const arr=EPG_INDEX.byName[n];const progs=[];arr.forEach(item=>{if(item.channelId&&EPG_INDEX.byId[item.channelId]){EPG_INDEX.byId[item.channelId].forEach(p=>progs.push(p))}else if(item.title){progs.push(item)}});if(progs.length)return progs.sort((a,b)=>(a.start?.getTime()||0)-(b.start?.getTime()||0))}
+for(const nameKey in EPG_INDEX.byName){if(!n)continue;if(nameKey.includes(n)||n.includes(nameKey)||nameKey.startsWith(n)||n.startsWith(nameKey)){const arr=EPG_INDEX.byName[nameKey];const progs=[];arr.forEach(item=>{if(item.channelId&&EPG_INDEX.byId[item.channelId]){EPG_INDEX.byId[item.channelId].forEach(p=>progs.push(p))}else if(item.title){progs.push(item)}});if(progs.length)return progs.sort((a,b)=>(a.start?.getTime()||0)-(b.start?.getTime()||0))}}
+return null}
+function getNowAndNextFromProgList(progs){if(!progs||progs.length===0)return{now:null,next:null};const nowTime=Date.now();let nowProg=null;let nextProg=null;for(let i=0;i<progs.length;i++){const p=progs[i];const s=p.start?p.start.getTime():null;const e=p.stop?p.stop.getTime():null;if(s&&e&&nowTime>=s&&nowTime<e){nowProg=p;nextProg=progs[i+1]||null;break}
+if(s&&nowTime<s){nextProg=p;break}}
+return{now:nowProg,next:nextProg}}
 
 /*******************************
  * Player & UI Logic
@@ -253,14 +128,18 @@ function toggleFavourite() {
     }
     updateSelectedChannelInNav();
 }
-function unmuteOnFirstUserAction() {
-    const oPlayButton = getEl("play_button_overlay");
+
+// --- FIX START: Simplified function for first user action ---
+let isFirstActionDone = false;
+function onFirstUserAction() {
+    if (isFirstActionDone) return;
+    isFirstActionDone = true;
+    
     try { oAvPlayer.muted = false; } catch (e) {}
-    if (oPlayButton) oPlayButton.classList.add('HIDDEN');
-    document.removeEventListener('click', unmuteOnFirstUserAction);
-    document.removeEventListener('keydown', unmuteOnFirstUserAction);
-    document.removeEventListener('touchstart', unmuteOnFirstUserAction);
+    if (oIdleAnimation) oIdleAnimation.classList.add('HIDDEN');
 }
+// --- FIX END ---
+
 async function initPlayer() {
     try {
         oAvPlayer.muted = true;
@@ -268,16 +147,6 @@ async function initPlayer() {
         oAvPlayer.setAttribute('muted','');
         oAvPlayer.setAttribute('playsinline','');
     } catch(e){}
-
-    // --- FIX: ADDED CLICK LISTENER FOR THE PLAY BUTTON ---
-    const oPlayButton = getEl("play_button_overlay");
-    if (oPlayButton) {
-        oPlayButton.addEventListener('click', (e) => {
-            e.stopPropagation(); 
-            unmuteOnFirstUserAction();
-        });
-    }
-    // --- END FIX ---
 
     await shaka.polyfill.installAll();
     if (!shaka.Player.isBrowserSupported()) {
@@ -314,9 +183,11 @@ async function initPlayer() {
     playlistReadyHandler();
     loadAllEpg().catch(err => console.warn('EPG load failed', err));
 }
+
 function playlistReadyHandler() {
     buildNav();
 }
+
 function updateSelectedChannelInNav() {
     if (!oChannelList) return;
     const currentSelected = oChannelList.querySelector('.selected');
@@ -446,336 +317,66 @@ function buildNav() {
         }
     }, 150);
 }
-// ... (The rest of the UI and navigation functions remain the same) ...
-function renderChannelSettings() {
-    oChannelSettingsList.innerHTML = '';
-    if (aFilteredChannelKeys.length === 0) return;
-    const currentKey = aFilteredChannelKeys[iCurrentChannel];
-    const channel = channels[currentKey];
-    channelSettingsOptions.forEach((opt, index) => {
-        const item = document.createElement('li');
-        item.id = opt.id;
-        let text = getLang(opt.langid);
-        if (opt.id === 'channel-setting-favourite') {
-            text = channel && channel.favorite ? 'Remove from Favourites' : 'Add to Favorites';
-        }
-        item.textContent = text;
-        if(index === iChannelSettingsIndex) item.classList.add('selected');
-        oChannelSettingsList.appendChild(item);
-    });
-}
-function updateStreamInfo() {
-    if (!player) return;
-    const activeTrack = player.getVariantTracks().find(t => t.active);
-    if (activeTrack) {
-        oStreamInfo.innerHTML = `codecs: ${activeTrack.videoCodec || activeTrack.audioCodec}<br>resolution: ${activeTrack.width}x${activeTrack.height}<br>bitrate: ${(activeTrack.bandwidth / 1000000).toFixed(3)} Mbit/s`;
-    } else {
-        oStreamInfo.innerHTML = 'Getting stream info...';
-    }
-}
-function showChannelName() {
-    clearTimeout(channelNameTimeout);
-    if (aFilteredChannelKeys.length === 0) return;
-    const key = aFilteredChannelKeys[iCurrentChannel];
-    if (!key) return;
-    const channel = channels[key];
-    if (!channel) return;
-    getEl('channel_name').textContent = channel.name;
-    const epgProgs = findEpgForChannel(channel);
-    let epgText = 'EPG not available';
-    if (epgProgs) {
-        const { now, next } = getNowAndNextFromProgList(epgProgs);
-        if (next) {
-            const t = next.start ? next.start : null;
-            if (t) {
-                const local = new Date(t.getTime());
-                const hh = String(local.getHours()).padStart(2,'0');
-                const mm = String(local.getMinutes()).padStart(2,'0');
-                epgText = `Next: ${next.title}${ next.sub ? ' - ' + next.sub : '' } (${hh}:${mm})`;
-            } else {
-                epgText = `Next: ${next.title || 'Unknown'}`;
-            }
-        } else { epgText = 'EPG not available'; }
-    }
-    getEl('channel_epg').innerHTML = epgText;
-    getEl('ch_logo').innerHTML = channel.logo ? `<img src="${channel.logo}" alt="">` : '';
-    oChannelInfo.classList.add('visible');
-    channelNameTimeout = setTimeout(hideChannelName, 5000);
-}
-function hideChannelName() { oChannelInfo.classList.remove('visible'); }
-function getLang(sKey) { return (i18n.en && i18n.en[sKey]) ? i18n.en[sKey] : sKey; }
-function applyLang() { document.querySelectorAll('[data-langid]').forEach(el => { el.innerHTML = getLang(el.dataset.langid); }); }
-function clearUi(exclude) {
-    if (exclude !== 'nav') hideNav();
-    if (exclude !== 'channelSettings') hideChannelSettings();
-    if (exclude !== 'guide') hideGuide();
-    if (exclude !== 'channelName') hideChannelName();
-}
-function showNav() {
-    clearUi('nav');
-    bNavOpened = true;
-    oSearchField.disabled = false;
-    oNav.classList.add('visible');
-    if (oChannelList) {
-        oChannelList.classList.remove('fade-out');
-        oChannelList.classList.add('fade-in');
-        oChannelList.style.opacity = ''; oChannelList.style.pointerEvents = '';
-    }
-    hideGroups();
-    buildNav();
-}
-function hideNav() {
-    bNavOpened = false;
-    bGroupsOpened = false;
-    oSearchField.disabled = true;
-    oNav.classList.remove('visible');
-}
-function showGroups() {
-    if(bNavOpened) {
-        bGroupsOpened = true;
-        getEl('list_container').classList.add('groups-opened');
-        navigateGroupList();
-    }
-}
-function hideGroups() {
-    bGroupsOpened = false;
-    getEl('list_container').classList.remove('groups-opened');
-}
-function showChannelSettings() {
-    clearUi('channelSettings');
-    bChannelSettingsOpened = true;
-    iChannelSettingsIndex = 0;
-    renderChannelSettings();
-    oStreamInfo.classList.remove('HIDDEN');
-    updateStreamInfo();
-    oChannelSettings.classList.add('visible');
-}
-function hideChannelSettings() {
-    bChannelSettingsOpened = false;
-    oStreamInfo.classList.add('HIDDEN');
-    oChannelSettings.classList.remove('visible');
-}
-function showGuide() {
-    bGuideOpened = true;
-    renderGuideContent();
-    oGuide.style.display = 'block';
-    oGuide.setAttribute('aria-hidden','false');
-}
-function hideGuide() {
-    bGuideOpened = false;
-    oGuide.style.display = 'none';
-    oGuide.setAttribute('aria-hidden','true');
-}
-function renderGuideContent() {
-    const container = getEl('guide_content');
-    container.innerHTML = ` <h2>${getLang('guideControlsHeadline')}</h2> <ul>${getLang('guideControls')}</ul> `;
-}
-function animateChannelListSwap(callback) {
-    if (!oChannelList) { try { callback(); } catch(e){}; return; }
-    oChannelList.classList.remove('fade-in');
-    oChannelList.classList.add('fade-out');
-    const onEnd = () => {
-        oChannelList.removeEventListener('transitionend', onEnd);
-        try { callback(); } catch(e) { console.error(e); }
-        requestAnimationFrame(() => {
-            oChannelList.classList.remove('fade-out');
-            oChannelList.classList.add('fade-in');
-        });
-    };
-    oChannelList.addEventListener('transitionend', onEnd);
-    setTimeout(() => { if (oChannelList.classList.contains('fade-out')) onEnd(); }, 800);
-}
-function selectGroupListItem(item) {
-    if(!item) item = document.querySelector('#group_list li.selected');
-    if(!item) return;
-    document.querySelectorAll('#group_list li.selected').forEach(el => el.classList.remove('selected'));
-    item.classList.add('selected');
-    if (item.id === 'epg_group') {
-        hideNav();
-        alert("Full EPG screen placeholder.");
-    } else if (item.id === 'guide_group') {
-        showGuide();
-    } else {
-        const lastChannelKey = aFilteredChannelKeys.length > iCurrentChannel ? aFilteredChannelKeys[iCurrentChannel] : null;
-        sSelectedGroup = item.dataset.group;
-        preventAutoPlay = true;
-        animateChannelListSwap(() => {
-            buildNav();
-            if (lastChannelKey) {
-                const newIndex = aFilteredChannelKeys.indexOf(lastChannelKey);
-                iCurrentChannel = (newIndex !== -1) ? newIndex : 0;
-            } else {
-                iCurrentChannel = 0;
-            }
-            updateSelectedChannelInNav();
-        });
-        hideGroups();
-        setTimeout(() => { preventAutoPlay = false; }, 350);
-    }
-}
-function navigateGroupList(direction) {
-    const items = document.querySelectorAll('#group_list ul > li');
-    if (!items || items.length === 0) return;
-    let currentIndex = Array.from(items).findIndex(item => item.classList.contains('selected'));
-    if(currentIndex === -1) currentIndex = 0;
-    items[currentIndex].classList.remove('selected');
-    if (direction === 'up') {
-        currentIndex = (currentIndex > 0) ? currentIndex - 1 : items.length - 1;
-    } else if (direction === 'down') {
-        currentIndex = (currentIndex < items.length - 1) ? currentIndex + 1 : 0;
-    }
-    items[currentIndex].classList.add('selected');
-    items[currentIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-document.addEventListener('keydown', (e) => {
-    if (document.activeElement === oSearchField) {
-        if (e.key === 'Escape' || e.key === 'Enter' || e.key === 'ArrowDown') {
-            oSearchField.blur();
-        }
-        return;
-    }
-    if (bGuideOpened) {
-        if (e.key === 'Escape') hideGuide();
-        return;
-    }
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) e.preventDefault();
-    if (bNavOpened) {
-        if(bGroupsOpened){
-            switch(e.key) {
-                case 'ArrowUp': navigateGroupList('up'); break;
-                case 'ArrowDown': navigateGroupList('down'); break;
-                case 'ArrowRight': hideGroups(); break;
-                case 'Escape': hideNav(); break;
-                case 'Enter': selectGroupListItem(); break;
-            }
-        } else {
-            switch(e.key) {
-                case 'ArrowUp': if (iCurrentChannel > 0) { loadChannel(iCurrentChannel - 1); } else { oSearchField.focus(); } break;
-                case 'ArrowDown': loadChannel(iCurrentChannel + 1); break;
-                case 'ArrowRight': hideNav(); break;
-                case 'ArrowLeft': showGroups(); break;
-                case 'Enter': loadChannel(iCurrentChannel); setTimeout(hideNav, 100); break;
-                case 'Escape': hideNav(); break;
-            }
-        }
-    } else if (bChannelSettingsOpened) {
-        switch(e.key) {
-            case 'ArrowUp': iChannelSettingsIndex = (iChannelSettingsIndex > 0) ? iChannelSettingsIndex - 1 : channelSettingsOptions.length - 1; renderChannelSettings(); break;
-            case 'ArrowDown': iChannelSettingsIndex = (iChannelSettingsIndex < channelSettingsOptions.length - 1) ? iChannelSettingsIndex + 1 : 0; renderChannelSettings(); break;
-            case 'ArrowLeft': case 'Escape': hideChannelSettings(); break;
-            case 'Enter':
-                if(channelSettingsOptions[iChannelSettingsIndex].id === 'channel-setting-favourite') {
-                    toggleFavourite();
-                } else {
-                    alert(`Action for: ${channelSettingsOptions[iChannelSettingsIndex].langid}`);
-                    hideChannelSettings();
-                }
-                break;
-        }
-    } else {
-        switch(e.key) {
-            case 'ArrowLeft': showNav(); break;
-            case 'ArrowRight': showChannelSettings(); break;
-            case 'Enter':
-                if (oChannelInfo.classList.contains('visible')) {
-                    hideChannelName();
-                } else {
-                    showChannelName();
-                }
-                break;
-            case 'ArrowUp': loadChannel(iCurrentChannel - 1); break;
-            case 'ArrowDown': loadChannel(iCurrentChannel + 1); break;
-            case 'h': showGuide(); break;
-            case 'Escape': if (oChannelInfo.classList.contains('visible')) hideChannelName(); break;
-        }
-    }
-});
-oSearchField.addEventListener('input', () => {
-    iCurrentChannel = 0;
-    preventAutoPlay = true;
-    buildNav();
-    setTimeout(() => { preventAutoPlay = false; }, 350);
-});
-function handleTouchStart(e) {
-    const firstTouch = e.touches[0];
-    touchStartX = firstTouch.clientX;
-    touchStartY = firstTouch.clientY;
-    touchEndX = firstTouch.clientX;
-    touchEndY = firstTouch.clientY;
-}
-function handleTouchMove(e) {
-    if (e.touches.length > 0) {
-        touchEndX = e.touches[0].clientX;
-        touchEndY = e.touches[0].clientY;
-    }
-}
-function handleTouchEnd(e) {
-    if (touchStartX === 0) return;
-    const oPlayButton = getEl("play_button_overlay");
-    const deltaX = touchEndX - touchStartX;
-    const deltaY = touchEndY - touchStartY;
-    const absDeltaX = Math.abs(deltaX);
-    const absDeltaY = Math.abs(deltaY);
 
-    const swipeThreshold = 50;
-    const tapThreshold = 10;
-    const target = e.target;
+// ... (Rest of the UI functions are unchanged) ...
+function renderChannelSettings(){oChannelSettingsList.innerHTML='';if(aFilteredChannelKeys.length===0)return;const currentKey=aFilteredChannelKeys[iCurrentChannel];const channel=channels[currentKey];channelSettingsOptions.forEach((opt,index)=>{const item=document.createElement('li');item.id=opt.id;let text=getLang(opt.langid);if(opt.id==='channel-setting-favourite'){text=channel&&channel.favorite?'Remove from Favourites':'Add to Favorites'}
+item.textContent=text;if(index===iChannelSettingsIndex)item.classList.add('selected');oChannelSettingsList.appendChild(item)})}
+function updateStreamInfo(){if(!player)return;const activeTrack=player.getVariantTracks().find(t=>t.active);if(activeTrack){oStreamInfo.innerHTML=`codecs: ${activeTrack.videoCodec||activeTrack.audioCodec}<br>resolution: ${activeTrack.width}x${activeTrack.height}<br>bitrate: ${(activeTrack.bandwidth/1000000).toFixed(3)} Mbit/s`}else{oStreamInfo.innerHTML='Getting stream info...'}}
+function showChannelName(){clearTimeout(channelNameTimeout);if(aFilteredChannelKeys.length===0)return;const key=aFilteredChannelKeys[iCurrentChannel];if(!key)return;const channel=channels[key];if(!channel)return;getEl('channel_name').textContent=channel.name;const epgProgs=findEpgForChannel(channel);let epgText='EPG not available';if(epgProgs){const{now,next}=getNowAndNextFromProgList(epgProgs);if(next){const t=next.start?next.start:null;if(t){const local=new Date(t.getTime());const hh=String(local.getHours()).padStart(2,'0');const mm=String(local.getMinutes()).padStart(2,'0');epgText=`Next: ${next.title}${next.sub?' - '+next.sub:''} (${hh}:${mm})`}else{epgText=`Next: ${next.title||'Unknown'}`}}else{epgText='EPG not available'}}
+getEl('channel_epg').innerHTML=epgText;getEl('ch_logo').innerHTML=channel.logo?`<img src="${channel.logo}" alt="">`:'';oChannelInfo.classList.add('visible');channelNameTimeout=setTimeout(hideChannelName,5000)}
+function hideChannelName(){oChannelInfo.classList.remove('visible')}
+function getLang(sKey){return(i18n.en&&i18n.en[sKey])?i18n.en[sKey]:sKey}
+function applyLang(){document.querySelectorAll('[data-langid]').forEach(el=>{el.innerHTML=getLang(el.dataset.langid)})}
+function clearUi(exclude){if(exclude!=='nav')hideNav();if(exclude!=='channelSettings')hideChannelSettings();if(exclude!=='guide')hideGuide();if(exclude!=='channelName')hideChannelName()}
+function showNav(){clearUi('nav');bNavOpened=true;oSearchField.disabled=false;oNav.classList.add('visible');if(oChannelList){oChannelList.classList.remove('fade-out');oChannelList.classList.add('fade-in');oChannelList.style.opacity='';oChannelList.style.pointerEvents=''}
+hideGroups();buildNav()}
+function hideNav(){bNavOpened=false;bGroupsOpened=false;oSearchField.disabled=true;oNav.classList.remove('visible')}
+function showGroups(){if(bNavOpened){bGroupsOpened=true;getEl('list_container').classList.add('groups-opened');navigateGroupList()}}
+function hideGroups(){bGroupsOpened=false;getEl('list_container').classList.remove('groups-opened')}
+function showChannelSettings(){clearUi('channelSettings');bChannelSettingsOpened=true;iChannelSettingsIndex=0;renderChannelSettings();oStreamInfo.classList.remove('HIDDEN');updateStreamInfo();oChannelSettings.classList.add('visible')}
+function hideChannelSettings(){bChannelSettingsOpened=false;oStreamInfo.classList.add('HIDDEN');oChannelSettings.classList.remove('visible')}
+function showGuide(){bGuideOpened=true;renderGuideContent();oGuide.style.display='block';oGuide.setAttribute('aria-hidden','false')}
+function hideGuide(){bGuideOpened=false;oGuide.style.display='none';oGuide.setAttribute('aria-hidden','true')}
+function renderGuideContent(){const container=getEl('guide_content');container.innerHTML=` <h2>${getLang('guideControlsHeadline')}</h2> <ul>${getLang('guideControls')}</ul> `}
+function animateChannelListSwap(callback){if(!oChannelList){try{callback()}catch(e){}
+return}
+oChannelList.classList.remove('fade-in');oChannelList.classList.add('fade-out');const onEnd=()=>{oChannelList.removeEventListener('transitionend',onEnd);try{callback()}catch(e){console.error(e)}
+requestAnimationFrame(()=>{oChannelList.classList.remove('fade-out');oChannelList.classList.add('fade-in')})};oChannelList.addEventListener('transitionend',onEnd);setTimeout(()=>{if(oChannelList.classList.contains('fade-out'))onEnd()},800)}
+function selectGroupListItem(item){if(!item)item=document.querySelector('#group_list li.selected');if(!item)return;document.querySelectorAll('#group_list li.selected').forEach(el=>el.classList.remove('selected'));item.classList.add('selected');if(item.id==='epg_group'){hideNav();alert("Full EPG screen placeholder.")}else if(item.id==='guide_group'){showGuide()}else{const lastChannelKey=aFilteredChannelKeys.length>iCurrentChannel?aFilteredChannelKeys[iCurrentChannel]:null;sSelectedGroup=item.dataset.group;preventAutoPlay=true;animateChannelListSwap(()=>{buildNav();if(lastChannelKey){const newIndex=aFilteredChannelKeys.indexOf(lastChannelKey);iCurrentChannel=(newIndex!==-1)?newIndex:0}else{iCurrentChannel=0}
+updateSelectedChannelInNav()});hideGroups();setTimeout(()=>{preventAutoPlay=false},350)}}
+function navigateGroupList(direction){const items=document.querySelectorAll('#group_list ul > li');if(!items||items.length===0)return;let currentIndex=Array.from(items).findIndex(item=>item.classList.contains('selected'));if(currentIndex===-1)currentIndex=0;items[currentIndex].classList.remove('selected');if(direction==='up'){currentIndex=(currentIndex>0)?currentIndex-1:items.length-1}else if(direction==='down'){currentIndex=(currentIndex<items.length-1)?currentIndex+1:0}
+items[currentIndex].classList.add('selected');items[currentIndex].scrollIntoView({behavior:'smooth',block:'center'})}
+document.addEventListener('keydown',e=>{if(document.activeElement===oSearchField){if(e.key==='Escape'||e.key==='Enter'||e.key==='ArrowDown'){oSearchField.blur()}
+return}
+if(bGuideOpened){if(e.key==='Escape')hideGuide();return}
+if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter'].includes(e.key))e.preventDefault();if(bNavOpened){if(bGroupsOpened){switch(e.key){case'ArrowUp':navigateGroupList('up');break;case'ArrowDown':navigateGroupList('down');break;case'ArrowRight':hideGroups();break;case'Escape':hideNav();break;case'Enter':selectGroupListItem();break}}else{switch(e.key){case'ArrowUp':if(iCurrentChannel>0){loadChannel(iCurrentChannel-1)}else{oSearchField.focus()}
+break;case'ArrowDown':loadChannel(iCurrentChannel+1);break;case'ArrowRight':hideNav();break;case'ArrowLeft':showGroups();break;case'Enter':loadChannel(iCurrentChannel);setTimeout(hideNav,100);break;case'Escape':hideNav();break}}}else if(bChannelSettingsOpened){switch(e.key){case'ArrowUp':iChannelSettingsIndex=(iChannelSettingsIndex>0)?iChannelSettingsIndex-1:channelSettingsOptions.length-1;renderChannelSettings();break;case'ArrowDown':iChannelSettingsIndex=(iChannelSettingsIndex<channelSettingsOptions.length-1)?iChannelSettingsIndex+1:0;renderChannelSettings();break;case'ArrowLeft':case'Escape':hideChannelSettings();break;case'Enter':if(channelSettingsOptions[iChannelSettingsIndex].id==='channel-setting-favourite'){toggleFavourite()}else{alert(`Action for: ${channelSettingsOptions[iChannelSettingsIndex].langid}`);hideChannelSettings()}
+break}}else{switch(e.key){case'ArrowLeft':showNav();break;case'ArrowRight':showChannelSettings();break;case'Enter':if(oChannelInfo.classList.contains('visible')){hideChannelName()}else{showChannelName()}
+break;case'ArrowUp':loadChannel(iCurrentChannel-1);break;case'ArrowDown':loadChannel(iCurrentChannel+1);break;case'h':showGuide();break;case'Escape':if(oChannelInfo.classList.contains('visible'))hideChannelName();break}}});
+oSearchField.addEventListener('input',()=>{iCurrentChannel=0;preventAutoPlay=true;buildNav();setTimeout(()=>{preventAutoPlay=false},350)});
+function handleTouchStart(e){const firstTouch=e.touches[0];touchStartX=firstTouch.clientX;touchStartY=firstTouch.clientY;touchEndX=firstTouch.clientX;touchEndY=firstTouch.clientY}
+function handleTouchMove(e){if(e.touches.length>0){touchEndX=e.touches[0].clientX;touchEndY=e.touches[0].clientY}}
+function handleTouchEnd(e){if(touchStartX===0)return;const deltaX=touchEndX-touchStartX;const deltaY=touchEndY-touchStartY;const absDeltaX=Math.abs(deltaX);const absDeltaY=Math.abs(deltaY);const swipeThreshold=50;const tapThreshold=10;const target=e.target;const isInsideScrollable=oNav.contains(target)&&target.closest('.custom-scrollbar');if(isInsideScrollable){if(absDeltaX>absDeltaY&&absDeltaX>swipeThreshold){if(deltaX>0){if(bGroupsOpened){}}else{if(!bGroupsOpened){hideGroups()}else{hideNav()}}}}
+else if(absDeltaX<tapThreshold&&absDeltaY<tapThreshold){if(bGuideOpened&&!oGuide.querySelector('.fullscreen-popup').contains(target)){hideGuide()}else if(bNavOpened&&!oNav.contains(target)){hideNav()}else if(bChannelSettingsOpened&&!oChannelSettings.contains(target)){hideChannelSettings()}else if(!bNavOpened&&!bChannelSettingsOpened&&!bGuideOpened&&!target.closest('#play_button_overlay')){showChannelName()}}else if(absDeltaX>swipeThreshold||absDeltaY>swipeThreshold){if(absDeltaX>absDeltaY){if(deltaX>0){if(bChannelSettingsOpened)hideChannelSettings();else if(bNavOpened&&!bGroupsOpened)showGroups();else showNav()}else{if(bNavOpened&&bGroupsOpened)hideGroups();else if(bNavOpened)hideNav();else showChannelSettings()}}else{if(!bNavOpened&&!bChannelSettingsOpened&&!bGuideOpened){if(deltaY>0){loadChannel(iCurrentChannel-1)}else{loadChannel(iCurrentChannel+1)}}}}
+touchStartX=0;touchStartY=0;touchEndX=0;touchEndY=0}
 
-    const isInsideScrollable = oNav.contains(target) && target.closest('.custom-scrollbar');
-    if (isInsideScrollable) {
-        if (absDeltaX > absDeltaY && absDeltaX > swipeThreshold) {
-             if (deltaX > 0) {
-                 if (bGroupsOpened) {}
-            } else {
-                 if (!bGroupsOpened) { hideGroups(); }
-                 else { hideNav(); }
-            }
-        }
-    }
-    else if (absDeltaX < tapThreshold && absDeltaY < tapThreshold) {
-        if (bGuideOpened && !oGuide.querySelector('.fullscreen-popup').contains(target)) {
-             hideGuide();
-        } else if (bNavOpened && !oNav.contains(target)) {
-            hideNav();
-        } else if (bChannelSettingsOpened && !oChannelSettings.contains(target)) {
-            hideChannelSettings();
-        } else if (!bNavOpened && !bChannelSettingsOpened && !bGuideOpened && !target.closest('#play_button_overlay')) {
-            showChannelName();
-        }
-    } else if (absDeltaX > swipeThreshold || absDeltaY > swipeThreshold) {
-        if (absDeltaX > absDeltaY) {
-            if (deltaX > 0) {
-                if (bChannelSettingsOpened) hideChannelSettings();
-                else if (bNavOpened && !bGroupsOpened) showGroups();
-                else showNav();
-            } else {
-                if (bNavOpened && bGroupsOpened) hideGroups();
-                else if (bNavOpened) hideNav();
-                else showChannelSettings();
-            }
-        } else {
-            if (!bNavOpened && !bChannelSettingsOpened && !bGuideOpened) {
-                if (deltaY > 0) {
-                    loadChannel(iCurrentChannel - 1);
-                } else {
-                    loadChannel(iCurrentChannel + 1);
-                }
-            }
-        }
-    }
-
-    touchStartX = 0; touchStartY = 0; touchEndX = 0; touchEndY = 0;
-}
-
-// Attach touch event listeners
 document.addEventListener('touchstart', handleTouchStart, false);
 document.addEventListener('touchmove', handleTouchMove, false);
 document.addEventListener('touchend', handleTouchEnd, false);
 
-// Initialize App
-document.addEventListener('click', unmuteOnFirstUserAction);
-document.addEventListener('keydown', unmuteOnFirstUserAction);
-document.addEventListener('touchstart', unmuteOnFirstUserAction);
+// --- FIX START: Dedicated listeners for the play button ---
+const oPlayButton = getEl("play_button_overlay");
+if (oPlayButton) {
+    oPlayButton.addEventListener('click', onFirstUserAction);
+    
+    // Add touch listener for mobile devices
+    oPlayButton.addEventListener('touchstart', (e) => {
+        e.preventDefault(); // Prevents the browser from firing a 'click' event after the touch
+        onFirstUserAction();
+    });
+}
+// --- FIX END ---
+
 
 (function initDefaults() {
     const allGroup = document.getElementById('all_channels_group');
