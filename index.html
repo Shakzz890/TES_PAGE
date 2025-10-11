@@ -13,6 +13,97 @@
     
     <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.7.13/dist/shaka-player.ui.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js" integrity="sha512-+ZqvG9mQb2s4n3nA3KxTzF7k5b2Qazt+g0uO6k1yOJ8l4f6f5Qv2Kx0eQ9c2nJ8iU9K3q6mXq8bG4Y0G1m5Y5w4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <style>
+        /* Styles for the new playback controls container */
+        #playback_controls_container {
+            padding: 10px 15px;
+            background-color: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+
+        #playback_controls_container h3 {
+            margin: 0 0 10px 0;
+            font-size: 1em;
+            color: #fff;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .controls-grid {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .controls-grid button {
+            background-color: #4169e1; /* royalblue */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .controls-grid button:hover {
+            background-color: #5a81e6;
+        }
+
+        .controls-grid button svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-grow: 1;
+        }
+
+        .volume-control input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 5px;
+            background: #ddd;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+            border-radius: 5px;
+        }
+
+        .volume-control input[type="range"]:hover {
+            opacity: 1;
+        }
+
+        .volume-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 15px;
+            height: 15px;
+            background: #4169e1;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+
+        .volume-control input[type="range"]::-moz-range-thumb {
+            width: 15px;
+            height: 15px;
+            background: #4169e1;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+    </style>
 </head>
 <body>
     <video id="player" autoplay muted playsinline></video>
@@ -59,7 +150,20 @@
             <div id="list_container_right_scrollarea">
                 <div id="stream-info" class="HIDDEN"></div>
                 <h2 class="list_headline i18n" data-langid="channelSettings"></h2>
-                <ul id="channel_settings_list"></ul>
+                <ul id="channel_settings_list">
+                    <li id="playback_controls_container">
+                        <h3 class="list_headline">Playback</h3>
+                        <div class="controls-grid">
+                            <button id="play_pause_button" title="Play/Pause">
+                                </button>
+                            <button id="mute_unmute_button" title="Mute/Unmute">
+                                </button>
+                            <div class="volume-control">
+                                <input type="range" id="volume_slider" min="0" max="1" step="0.01" value="1" title="Volume">
+                            </div>
+                        </div>
+                    </li>
+                </ul>
             </div>
         </div>
 
@@ -80,7 +184,5 @@
         
         <div id="loader" class="fullscreen HIDDEN"><div id="spinner"></div></div>
     </div>
-
-    <script src="script.js"></script>
 </body>
 </html>
