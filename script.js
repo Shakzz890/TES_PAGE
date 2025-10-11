@@ -40,12 +40,13 @@ const channelSettingsOptions = [
 /*******************************
  * State & DOM refs
  *******************************/
+// --- MERGED: Define a default channel key for autoplay ---
+const DEFAULT_CHANNEL_KEY = 'kapamilya'; // Change this to your preferred startup channel
+
 let player, iCurrentChannel = 0, aFilteredChannelKeys = [], sSelectedGroup = '__all', bNavOpened = false, bGroupsOpened = false, bGuideOpened = false, bChannelSettingsOpened = false, iChannelSettingsIndex = 0, channelNameTimeout;
 let preventAutoPlay = false;
 let touchStartX = 0, touchStartY = 0, touchEndX = 0, touchEndY = 0;
-// --- FIX START: Add a flag to track the initial load for autoplay ---
 let isInitialLoad = true;
-// --- FIX END ---
 
 const EPG_INDEX = { byId: {}, byName: {} };
 
@@ -81,6 +82,41 @@ function normalizeForMatch(s) {
     return s.toString().toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+/**************************************************************
+ * VIEWER COUNT FEATURE (Ported from old script - requires backend)
+ **************************************************************/
+/*
+// This function generates a unique ID for the user's device to track unique viewers
+function getOrCreateDeviceId() {
+    let deviceId = localStorage.getItem('shakzzTvDeviceId');
+    if (!deviceId) {
+        deviceId = window.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            const r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+        localStorage.setItem('shakzzTvDeviceId', deviceId);
+    }
+    return deviceId;
+}
+
+// This function calls your backend API to get the viewer count
+async function updateViewerCount() {
+    try {
+        const deviceId = getOrCreateDeviceId();
+        // IMPORTANT: You need to create this API endpoint on your server.
+        // It should receive a deviceId and return a JSON like { "count": 123 }
+        const res = await fetch(`/api/viewers?deviceId=${deviceId}`);
+        const data = await res.json();
+        
+        // Example: If you have an element <span id="viewerCount"></span> in your HTML
+        const viewerCountEl = document.getElementById('viewerCount');
+        if (viewerCountEl) viewerCountEl.innerText = data.count || 0;
+
+    } catch (e) {
+        console.error("Viewer count error", e);
+    }
+}
+*/
 /*******************************
  * EPG fetch & parse
  *******************************/
@@ -277,7 +313,6 @@ async function initPlayer() {
     }
     player = new shaka.Player(oAvPlayer);
     
-    /* BALANCED PERFORMANCE CONFIG */
     player.configure({
         abr: {
             enabled: true,
@@ -303,13 +338,16 @@ async function initPlayer() {
     loadFavoritesFromStorage();
     playlistReadyHandler();
     loadAllEpg().catch(err => console.warn('EPG load failed', err));
+    
+    /*
+    // To enable viewer count, uncomment these lines
+    updateViewerCount();
+    setInterval(updateViewerCount, 15000); // Update every 15 seconds
+    */
 }
-// --- FIX START: Simplify this handler, the main logic is moved to buildNav ---
 function playlistReadyHandler() {
     buildNav();
-    // The initial load call is now triggered inside buildNav to avoid the race condition.
 }
-// --- FIX END ---
 function updateSelectedChannelInNav() {
     if (!oChannelList) return;
     const currentSelected = oChannelList.querySelector('.selected');
@@ -337,7 +375,7 @@ async function loadChannel(index) {
     }
 
     oLoader.classList.remove('HIDDEN');
-    oBody.classList.add('channel-is-loading'); // Add loading class to body
+    oBody.classList.add('channel-is-loading');
     showChannelName();
     updateSelectedChannelInNav();
 
@@ -360,7 +398,7 @@ async function loadChannel(index) {
         showIdleAnimation();
     } finally {
         oLoader.classList.add('HIDDEN');
-        oBody.classList.remove('channel-is-loading'); // Remove loading class from body
+        oBody.classList.remove('channel-is-loading');
     }
 }
 function buildNav() {
@@ -399,7 +437,6 @@ function buildNav() {
                 toggleFavourite();
             });
             
-            // --- FIXED: Add long-press for mobile favorites ---
             let pressTimer;
             item.addEventListener('touchstart', (e) => {
                 if (e.touches.length > 1) { clearTimeout(pressTimer); return; }
@@ -412,7 +449,6 @@ function buildNav() {
             });
             item.addEventListener('touchend', () => clearTimeout(pressTimer));
             item.addEventListener('touchmove', () => clearTimeout(pressTimer));
-            // --- End Fix ---
 
             const logoHtml = channel.logo ? `<div class="nav_logo"><img src="${channel.logo}" alt=""></div>` : '<div class="nav_logo"></div>';
             const favHtml = channel.favorite ? `<span class="fav-star">⭐</span>` : '';
@@ -423,22 +459,29 @@ function buildNav() {
 
         updateSelectedChannelInNav();
 
-        // --- FIX START: Trigger autoplay from here, AFTER the channel list is built ---
+        // --- MERGED & REFINED AUTOPLAY LOGIC ---
         if (isInitialLoad && aFilteredChannelKeys.length > 0) {
-            isInitialLoad = false; // Ensure this only runs once
-            iCurrentChannel = 0;
+            isInitialLoad = false;
+            
+            // Try to find the default channel's index in the current list
+            let initialIndex = aFilteredChannelKeys.indexOf(DEFAULT_CHANNEL_KEY);
+            
+            // If the default channel isn't found (e.g., it was removed), fall back to the first channel
+            if (initialIndex === -1) {
+                initialIndex = 0; 
+            }
+            
             try {
-                loadChannel(0);
+                loadChannel(initialIndex);
             } catch (e) {
                 console.warn('Initial autoplay loadChannel error', e);
                 showIdleAnimation();
             }
         } else if (isInitialLoad) {
-            // If it's the first load but no channels were found
             isInitialLoad = false;
             showIdleAnimation();
         }
-        // --- FIX END ---
+        // --- END MERGED LOGIC ---
     }, 150);
 }
 function renderChannelSettings() {
@@ -693,9 +736,8 @@ document.addEventListener('keydown', (e) => {
 });
 oSearchField.addEventListener('input', () => {
     iCurrentChannel = 0;
-    preventAutoPlay = true; // Prevent loading on every keystroke
+    preventAutoPlay = true;
     buildNav();
-    // Optional: could add a debounce here to auto-load after user stops typing
     setTimeout(() => { preventAutoPlay = false; }, 350);
 });
 
@@ -729,20 +771,17 @@ function handleTouchEnd(e) {
     const tapThreshold = 10;
     const target = e.target;
 
-    // Check if the target is inside a scrollable area in the nav panels
     const isInsideScrollable = oNav.contains(target) && target.closest('.custom-scrollbar');
     if (isInsideScrollable) {
-        // Allow native vertical scroll, but handle horizontal swipes
         if (absDeltaX > absDeltaY && absDeltaX > swipeThreshold) {
-             if (deltaX > 0) { // Swipe Right
-                 if (bGroupsOpened) { /* Do nothing, allow scroll */ }
-            } else { // Swipe Left
+             if (deltaX > 0) {
+                 if (bGroupsOpened) {}
+            } else {
                  if (!bGroupsOpened) { hideGroups(); }
                  else { hideNav(); }
             }
         }
     }
-    // Main interaction logic for tap/swipe
     else if (absDeltaX < tapThreshold && absDeltaY < tapThreshold) {
         if (bGuideOpened && !oGuide.querySelector('.fullscreen-popup').contains(target)) {
              hideGuide();
@@ -755,20 +794,20 @@ function handleTouchEnd(e) {
         }
     } else if (absDeltaX > swipeThreshold || absDeltaY > swipeThreshold) {
         if (absDeltaX > absDeltaY) {
-            if (deltaX > 0) { // Swipe Right
+            if (deltaX > 0) {
                 if (bChannelSettingsOpened) hideChannelSettings();
                 else if (bNavOpened && !bGroupsOpened) showGroups();
                 else showNav();
-            } else { // Swipe Left
+            } else {
                 if (bNavOpened && bGroupsOpened) hideGroups();
                 else if (bNavOpened) hideNav();
                 else showChannelSettings();
             }
         } else {
             if (!bNavOpened && !bChannelSettingsOpened && !bGuideOpened) {
-                if (deltaY > 0) { // Swipe Down
+                if (deltaY > 0) {
                     loadChannel(iCurrentChannel - 1);
-                } else { // Swipe Up
+                } else {
                     loadChannel(iCurrentChannel + 1);
                 }
             }
