@@ -40,8 +40,7 @@ const channelSettingsOptions = [
 /*******************************
  * State & DOM refs
  *******************************/
-// --- MERGED: Define a default channel key for autoplay ---
-const DEFAULT_CHANNEL_KEY = 'kapamilya'; // Change this to your preferred startup channel
+const DEFAULT_CHANNEL_KEY = 'kapamilya';
 
 let player, iCurrentChannel = 0, aFilteredChannelKeys = [], sSelectedGroup = '__all', bNavOpened = false, bGroupsOpened = false, bGuideOpened = false, bChannelSettingsOpened = false, iChannelSettingsIndex = 0, channelNameTimeout;
 let preventAutoPlay = false;
@@ -50,7 +49,7 @@ let isInitialLoad = true;
 
 const EPG_INDEX = { byId: {}, byName: {} };
 
-const oBody = document.body, getEl = (id) => document.getElementById(id), oAvPlayer = getEl("player"), oNav = getEl("nav"), oChannelSettings = getEl("channel_settings"), oChannelSettingsList = getEl("channel_settings_list"), oChannelList = getEl("channel_list"), oChannelInfo = getEl("channel_info"), oStreamInfo = getEl("stream-info"), oGuide = getEl("guide"), oLoader = getEl("loader"), oSearchField = getEl("search_field"), oIdleAnimation = getEl("idle_animation"), oPlayButton = getEl("play_button_overlay");
+const oBody = document.body, getEl = (id) => document.getElementById(id), oAvPlayer = getEl("player"), oNav = getEl("nav"), oChannelSettings = getEl("channel_settings"), oChannelSettingsList = getEl("channel_settings_list"), oChannelList = getEl("channel_list"), oChannelInfo = getEl("channel_info"), oStreamInfo = getEl("stream-info"), oGuide = getEl("guide"), oLoader = getEl("loader"), oSearchField = getEl("search_field"), oIdleAnimation = getEl("idle_animation");
 
 /*******************************
  * Helpers
@@ -82,44 +81,7 @@ function normalizeForMatch(s) {
     return s.toString().toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-/**************************************************************
- * VIEWER COUNT FEATURE (Ported from old script - requires backend)
- **************************************************************/
-/*
-// This function generates a unique ID for the user's device to track unique viewers
-function getOrCreateDeviceId() {
-    let deviceId = localStorage.getItem('shakzzTvDeviceId');
-    if (!deviceId) {
-        deviceId = window.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-            const r = Math.random() * 16 | 0;
-            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-        });
-        localStorage.setItem('shakzzTvDeviceId', deviceId);
-    }
-    return deviceId;
-}
-
-// This function calls your backend API to get the viewer count
-async function updateViewerCount() {
-    try {
-        const deviceId = getOrCreateDeviceId();
-        // IMPORTANT: You need to create this API endpoint on your server.
-        // It should receive a deviceId and return a JSON like { "count": 123 }
-        const res = await fetch(`/api/viewers?deviceId=${deviceId}`);
-        const data = await res.json();
-        
-        // Example: If you have an element <span id="viewerCount"></span> in your HTML
-        const viewerCountEl = document.getElementById('viewerCount');
-        if (viewerCountEl) viewerCountEl.innerText = data.count || 0;
-
-    } catch (e) {
-        console.error("Viewer count error", e);
-    }
-}
-*/
-/*******************************
- * EPG fetch & parse
- *******************************/
+// ... (Epg functions remain the same) ...
 async function fetchTextOrGz(url) {
     try {
         const res = await fetch(url);
@@ -266,6 +228,7 @@ function getNowAndNextFromProgList(progs) {
     return { now: nowProg, next: nextProg };
 }
 
+
 /*******************************
  * Player & UI Logic
  *******************************/
@@ -291,6 +254,7 @@ function toggleFavourite() {
     updateSelectedChannelInNav();
 }
 function unmuteOnFirstUserAction() {
+    const oPlayButton = getEl("play_button_overlay");
     try { oAvPlayer.muted = false; } catch (e) {}
     if (oPlayButton) oPlayButton.classList.add('HIDDEN');
     document.removeEventListener('click', unmuteOnFirstUserAction);
@@ -304,6 +268,17 @@ async function initPlayer() {
         oAvPlayer.setAttribute('muted','');
         oAvPlayer.setAttribute('playsinline','');
     } catch(e){}
+
+    // --- FIX: ADDED CLICK LISTENER FOR THE PLAY BUTTON ---
+    const oPlayButton = getEl("play_button_overlay");
+    if (oPlayButton) {
+        oPlayButton.addEventListener('click', (e) => {
+            e.stopPropagation(); 
+            unmuteOnFirstUserAction();
+        });
+    }
+    // --- END FIX ---
+
     await shaka.polyfill.installAll();
     if (!shaka.Player.isBrowserSupported()) {
         console.error('Browser not supported!');
@@ -338,12 +313,6 @@ async function initPlayer() {
     loadFavoritesFromStorage();
     playlistReadyHandler();
     loadAllEpg().catch(err => console.warn('EPG load failed', err));
-    
-    /*
-    // To enable viewer count, uncomment these lines
-    updateViewerCount();
-    setInterval(updateViewerCount, 15000); // Update every 15 seconds
-    */
 }
 function playlistReadyHandler() {
     buildNav();
@@ -459,18 +428,12 @@ function buildNav() {
 
         updateSelectedChannelInNav();
 
-        // --- MERGED & REFINED AUTOPLAY LOGIC ---
         if (isInitialLoad && aFilteredChannelKeys.length > 0) {
             isInitialLoad = false;
-            
-            // Try to find the default channel's index in the current list
             let initialIndex = aFilteredChannelKeys.indexOf(DEFAULT_CHANNEL_KEY);
-            
-            // If the default channel isn't found (e.g., it was removed), fall back to the first channel
             if (initialIndex === -1) {
                 initialIndex = 0; 
             }
-            
             try {
                 loadChannel(initialIndex);
             } catch (e) {
@@ -481,9 +444,9 @@ function buildNav() {
             isInitialLoad = false;
             showIdleAnimation();
         }
-        // --- END MERGED LOGIC ---
     }, 150);
 }
+// ... (The rest of the UI and navigation functions remain the same) ...
 function renderChannelSettings() {
     oChannelSettingsList.innerHTML = '';
     if (aFilteredChannelKeys.length === 0) return;
@@ -540,10 +503,6 @@ function showChannelName() {
     channelNameTimeout = setTimeout(hideChannelName, 5000);
 }
 function hideChannelName() { oChannelInfo.classList.remove('visible'); }
-
-/*******************************
- * UI Panels & Navigation
- *******************************/
 function getLang(sKey) { return (i18n.en && i18n.en[sKey]) ? i18n.en[sKey] : sKey; }
 function applyLang() { document.querySelectorAll('[data-langid]').forEach(el => { el.innerHTML = getLang(el.dataset.langid); }); }
 function clearUi(exclude) {
@@ -668,9 +627,6 @@ function navigateGroupList(direction) {
     items[currentIndex].classList.add('selected');
     items[currentIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
-/*******************************
- * Keyboard & Input Handling
- *******************************/
 document.addEventListener('keydown', (e) => {
     if (document.activeElement === oSearchField) {
         if (e.key === 'Escape' || e.key === 'Enter' || e.key === 'ArrowDown') {
@@ -740,10 +696,6 @@ oSearchField.addEventListener('input', () => {
     buildNav();
     setTimeout(() => { preventAutoPlay = false; }, 350);
 });
-
-/*******************************
- * Touch Controls for Mobile
- *******************************/
 function handleTouchStart(e) {
     const firstTouch = e.touches[0];
     touchStartX = firstTouch.clientX;
@@ -751,17 +703,15 @@ function handleTouchStart(e) {
     touchEndX = firstTouch.clientX;
     touchEndY = firstTouch.clientY;
 }
-
 function handleTouchMove(e) {
     if (e.touches.length > 0) {
         touchEndX = e.touches[0].clientX;
         touchEndY = e.touches[0].clientY;
     }
 }
-
 function handleTouchEnd(e) {
     if (touchStartX === 0) return;
-
+    const oPlayButton = getEl("play_button_overlay");
     const deltaX = touchEndX - touchStartX;
     const deltaY = touchEndY - touchStartY;
     const absDeltaX = Math.abs(deltaX);
@@ -789,7 +739,7 @@ function handleTouchEnd(e) {
             hideNav();
         } else if (bChannelSettingsOpened && !oChannelSettings.contains(target)) {
             hideChannelSettings();
-        } else if (!bNavOpened && !bChannelSettingsOpened && !bGuideOpened && !oPlayButton.contains(target)) {
+        } else if (!bNavOpened && !bChannelSettingsOpened && !bGuideOpened && !target.closest('#play_button_overlay')) {
             showChannelName();
         }
     } else if (absDeltaX > swipeThreshold || absDeltaY > swipeThreshold) {
