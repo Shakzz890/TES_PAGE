@@ -2780,3 +2780,1585 @@ function playVideo() {
     return;
   }
 
+if (bFirstPlayStatus === 0) {
+  hideElement("play_button");
+  bFirstPlayStatus = 1;
+}
+
+if (oAvPlayer) {
+  bFirstPlayStatus = 2;
+  hideElement("play_button");
+  oAvPlayer.play();
+}
+}
+
+function stopVideo() {
+if (sDeviceFamily === "Samsung") {
+  try {
+    webapis.avplay.stop();
+    bPlaying = false;
+  } catch (e) {
+    debugError(e);
+  }
+}
+}
+
+function isLive() {
+try {
+  switch (sDeviceFamily) {
+    case "Browser":
+    case "LG":
+      return oHlsApi.latestLevelDetails && oHlsApi.latestLevelDetails.live;
+    case "Samsung":
+      return webapis.avplay.getStreamingProperty("IS_LIVE") == "1";
+  }
+} catch (e) {}
+
+return false;
+}
+
+function togglePlayState() {
+switch (sDeviceFamily) {
+  case "Browser":
+  case "LG":
+    if (oAvPlayer.paused || oAvPlayer.ended) oAvPlayer.play();
+    else oAvPlayer.pause();
+    break;
+  case "Samsung":
+    if (bPlaying) {
+      webapis.avplay.pause();
+    } else {
+      webapis.avplay.play();
+    }
+    bPlaying = !bPlaying;
+    changeButtonState("playpause");
+    break;
+  case "Android":
+    if (typeof m3uConnector === "object") {
+      if (bPlaying) {
+        m3uConnector.pauseVideo();
+      } else {
+        m3uConnector.resumeVideo();
+      }
+      bPlaying = !bPlaying;
+      changeButtonState("playpause");
+    }
+    break;
+}
+}
+
+function loadTizenFramework() {
+oAvPlayer = document.createElement("object");
+oAvPlayer.id = "player_samsung";
+oAvPlayer.type = "application/avplayer";
+document.body.appendChild(oAvPlayer);
+
+var aAvPlayErrors = {
+  PLAYER_ERROR_NONE: "Operation has successfully completed; no error.",
+  PLAYER_ERROR_INVALID_PARAMETER: "Unable to find the parameter",
+  PLAYER_ERROR_NO_SUCH_FILE: "Unable to find the specified media content",
+  PLAYER_ERROR_INVALID_OPERATION: "Invalid API Call at the moment",
+  PLAYER_ERROR_SEEK_FAILED:
+    "Failed to perform seek operation, or seek operation called during an invalid state",
+  PLAYER_ERROR_INVALID_STATE:
+    "AVPlay API method was called during an invalid state",
+  PLAYER_ERROR_NOT_SUPPORTED_FILE: "Multimedia file type not supported",
+  PLAYER_ERROR_NOT_SUPPORTED_FORMAT: "Multimedia file format not supported",
+  PLAYER_ERROR_INVALID_URI: "Input URI is in an invalid format",
+  PLAYER_ERROR_CONNECTION_FAILED:
+    "Failed multiple attempts to connect to the specified content server",
+  PLAYER_ERROR_GENEREIC: "Failed to create the display window",
+};
+
+var oSubtitlesBox = getEl("subtitles");
+var oListener = {
+  onbufferingstart: function () {
+    hideChannelError();
+  },
+  onbufferingprogress: function (percent) {},
+  onbufferingcomplete: function () {
+    hideLoader();
+  },
+  onstreamcompleted: function () {
+    stopVideo();
+    playVideo();
+  },
+  oncurrentplaytime: function (iCurrentTime) {
+    updateProgressBar(Math.floor(iCurrentTime / 1000));
+  },
+  onerror: function (eventType) {
+    if (
+      eventType === "PLAYER_ERROR_CONNECTION_FAILED" ||
+      eventType === "PLAYER_ERROR_NOT_SUPPORTED_FORMAT" ||
+      eventType === "PLAYER_ERROR_NOT_SUPPORTED_FILE" ||
+      eventType === "PLAYER_ERROR_INVALID_OPERATION"
+    ) {
+      bStreamWasInterrupted = true;
+      if (bChannelWasAlreadyPlaying && tryReconnect()) {
+        debug("onerror tryReconnect");
+        return false;
+      }
+    }
+
+    var sError = getLang("channelLoadError"),
+      sCodeError = "Code: " + eventType;
+    if (aAvPlayErrors[eventType]) {
+      sCodeError = aAvPlayErrors[eventType] + "<br>" + sCodeError;
+    }
+
+    if (
+      eventType == "PLAYER_ERROR_NOT_SUPPORTED_FILE" ||
+      eventType == "PLAYER_ERROR_INVALID_URI"
+    ) {
+      sError = getLang("channelNotSupportedFile");
+    }
+
+    showChannelError(sError, sCodeError);
+    stopVideo();
+    bPlayerLoaded = false;
+  },
+  onerrormsg: function (eventType, eventMsg) {},
+  onevent: function (eventType, eventData) {
+    if (
+      eventType === "PLAYER_MSG_BITRATE_CHANGE" ||
+      eventType === "PLAYER_MSG_RESOLUTION_CHANGED"
+    ) {
+      if (bChannelSettingsOpened && webapis.avplay.getState() === "PLAYING") {
+        bTrackInfoLoaded = false;
+        loadTrackInfo();
+      }
+    }
+  },
+  onsubtitlechange: function (duration, sText, data3, data4) {
+    if (bSubtitlesActive) {
+      oSubtitlesBox.innerHTML = sText;
+    }
+  },
+  ondrmevent: function (drmEvent, drmData) {
+    if (
+      drmData.name === "Challenge" &&
+      aCurrentChannel &&
+      aCurrentChannel.drmT &&
+      aCurrentChannel.drmK
+    ) {
+      var sRequestSessionId = drmData.session_id,
+        oHttp = new XMLHttpRequest(),
+        sChallengeData = drmData.challenge;
+      oHttp.open("POST", aCurrentChannel.drmK);
+      if (aCurrentChannel.drmT === "playready") {
+        oHttp.responseType = "text";
+        oHttp.setRequestHeader("Content-Type", "text/xml");
+        oHttp.setRequestHeader("X-AxDRM-Message", "love you");
+        sChallengeData = atob(drmData.challenge);
+      } else {
+        oHttp.responseType = "arraybuffer";
+        sChallengeData = base64ToBytes(drmData.challenge);
+      }
+
+      oHttp.onreadystatechange = function () {
+        if (oHttp.readyState == XMLHttpRequest.DONE) {
+          if (oHttp.status < 400) {
+            switch (aCurrentChannel.drmT) {
+              case "com.widevine.alpha":
+              case "widevine":
+                var sLicenseData = btoa(
+                  new Uint8Array(oHttp.response).reduce(function (
+                    data,
+                    byte
+                  ) {
+                    return data + String.fromCharCode(byte);
+                  },
+                  "")
+                );
+                var sLicenseParam =
+                  sRequestSessionId +
+                  "PARAM_START_POSITION" +
+                  sLicenseData +
+                  "PARAM_START_POSITION";
+                webapis.avplay.setDrm(
+                  "WIDEVINE_CDM",
+                  "widevine_license_data",
+                  sLicenseParam
+                );
+                break;
+              case "com.microsoft.playready":
+              case "playready":
+                webapis.avplay.setDrm(
+                  "PLAYREADY",
+                  "InstallLicense",
+                  btoa(oHttp.response)
+                );
+                break;
+            }
+          }
+        }
+      };
+
+      oHttp.send(sChallengeData);
+      return;
+    }
+
+    if (drmData.name === "DrmError") {
+      debug("drmError -> stopVideo");
+      stopVideo();
+      webapis.avplay.close();
+    }
+  },
+};
+
+webapis.avplay.setListener(oListener);
+}
+
+function tryReconnect() {
+try {
+  if (iReconnectTimer) {
+    debug("tryReconnect old timer cleared");
+    clearTimeout(iReconnectTimer);
+    iReconnectTimer = false;
+  }
+
+  if (iCurrentChannel && iRetryChannelLoad < 5) {
+    debug("tryReconnect timer started");
+    showLoader();
+    iReconnectTimer = setTimeout(function () {
+      iRetryChannelLoad++;
+      iReconnectTryAfter = iReconnectTryAfter * 2;
+      debug("tryReconnect. Times: " + iRetryChannelLoad);
+      stopVideo();
+      playVideo();
+    }, iReconnectTryAfter);
+
+    return true;
+  }
+} catch (e) {
+  debugError(e);
+}
+
+return false;
+}
+
+function loadHlsFramework() {
+bHlsFrameworkLoaded = true;
+
+var bTryFallbackPlayback = false;
+
+oAvPlayer.addEventListener("abort", function () {});
+oAvPlayer.addEventListener("canplay", function () {
+  if (bFirstPlayStatus) {
+    oAvPlayer.play();
+  }
+
+  bTryFallbackPlayback = false;
+  hideLoader();
+  localStorage.setItem("iCurrentChannel", iCurrentChannel);
+
+  var bHasSubtitles = false;
+  if (sCurrentVideoEngine === "dash" && oDashApi) {
+    bHasSubtitles = oDashApi.getTracksFor("text").length;
+  } else if (sCurrentVideoEngine === "html") {
+  } else if (oHlsApi) {
+    bHasSubtitles = oHlsApi.subtitleTracks.length;
+  }
+
+  if (bHasSubtitles) {
+    showElement("cs_subtitles");
+  } else {
+    hideElement("cs_subtitles");
+  }
+
+  if (bChannelSettingsOpened) {
+    buildSubDubForm();
+  }
+});
+oAvPlayer.addEventListener("loadstart", function () {
+  showLoader();
+  if (bFirstPlayStatus === 0) {
+    showElement("play_button");
+  }
+});
+oAvPlayer.addEventListener("playing", function () {
+  hideElement("play_button");
+  bFirstPlayStatus = 1;
+  hideLoader();
+  hideChannelError();
+});
+oAvPlayer.addEventListener("error", function (ev) {
+  var sError = getLang("channelLoadError");
+  showChannelError(sError, "Connection error");
+  debug("error", ev);
+  hideLoader();
+});
+oAvPlayer.addEventListener("suspend", function () {
+  hideLoader();
+});
+oAvPlayer.addEventListener("ended", function () {
+  hideLoader();
+});
+oAvPlayer.addEventListener("waiting", function () {
+  showLoader();
+});
+oAvPlayer.addEventListener("stalled", function () {
+  debug("stalled");
+});
+
+if (Hls.isSupported()) {
+  oHlsOptions.maxAudioFramesDrift = 0;
+
+  oHlsApi = new Hls(oHlsOptions);
+  applyBufferSetting();
+  oHlsApi.attachMedia(oAvPlayer);
+  oHlsApi.subtitleDisplay = false;
+
+  oHlsApi.on(Hls.Events.LEVEL_SWITCHED, function (event, data) {
+    var oCurrentLevel = oHlsApi.levelController.levels[oHlsApi.currentLevel],
+      aAttrs = oCurrentLevel.attrs;
+    if (aAttrs && aAttrs["CODECS"]) {
+      oChannelTrack.innerHTML = "codecs: " + aAttrs["CODECS"];
+      oChannelTrack.innerHTML += "<br>resolution: " + aAttrs["RESOLUTION"];
+      if (oCurrentLevel.bitrate) {
+        var iMbits = (oCurrentLevel.bitrate / 1000000).toFixed(3);
+        oChannelTrack.innerHTML += "<br>bitrate: " + iMbits + " Mbit/s";
+      }
+    }
+  });
+
+  oHlsApi.on(Hls.Events.ERROR, function (eventType, data) {
+    var sError = getLang("channelLoadError");
+
+    if (data.fatal) {
+      if (bTryFallbackPlayback) {
+        showChannelError(sError, "Code: " + data.error.message);
+        hideLoader();
+        return;
+      }
+
+      try {
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            console.log("fatal network error encountered, try to recover");
+
+            if (
+              data.details == "manifestLoadError" ||
+              data.details == "manifestParsingError"
+            ) {
+              oAvPlayer.src = sPlayingUrl;
+              break;
+            }
+
+            if (
+              data.details == "levelParsingError" ||
+              data.details == "levelEmptyError"
+            ) {
+              showChannelError(
+                sError,
+                "Data received from server is broken. If this error persists, contact your IPTV provider."
+              );
+              hideLoader();
+              break;
+            }
+
+            if (data.details == "keyLoadError") {
+              showChannelError(sError, "Code: " + data.error.message);
+              hideLoader();
+              break;
+            }
+
+            try {
+              bTryFallbackPlayback = true;
+              oHlsApi.startLoad();
+            } catch (e) {
+              debugError(e);
+            }
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            oAvPlayer.src = data.url;
+            bTryFallbackPlayback = true;
+            oHlsApi.recoverMediaError();
+            break;
+
+          case Hls.ErrorTypes.KEY_SYSTEM_ERROR:
+          default:
+            showChannelError(sError, "Code: " + eventType);
+            break;
+        }
+      } catch (e) {
+        debugError(e);
+        showChannelError(sError, "Code: " + e.message);
+      }
+    }
+
+    if (eventType == "PLAYER_ERROR_CONNECTION_FAILED") {
+    }
+    if (
+      eventType == "PLAYER_ERROR_NOT_SUPPORTED_FILE" ||
+      eventType == "PLAYER_ERROR_INVALID_URI"
+    ) {
+      sError = getLang("channelNotSupportedFile");
+    }
+    if (eventType == "PLAYER_ERROR_") {
+    }
+
+    bPlayerLoaded = false;
+  });
+}
+}
+
+function loadDashFramework() {
+bDashFrameworkLoaded = true;
+
+oDashApi = dashjs.MediaPlayer().create();
+oDashApi.initialize();
+oDashApi.updateSettings({
+  debug: {},
+  streaming: {
+    scheduling: {
+      scheduleWhilePaused: false,
+    },
+    buffer: {
+      fastSwitchEnabled: true,
+    },
+  },
+});
+
+oDashApi.setAutoPlay(true);
+}
+
+function channelPlayingCallback() {
+hideLoader();
+localStorage.setItem("iCurrentChannel", iCurrentChannel);
+hideChannelError();
+}
+
+function loadPlayerFrameworkOnce() {
+if (bFrameworkLoaded) {
+  return false;
+}
+
+switch (sDeviceFamily) {
+  case "Browser":
+  case "LG":
+    loadHlsFramework();
+    break;
+  case "Samsung":
+    loadTizenFramework();
+    break;
+}
+
+bFrameworkLoaded = true;
+
+document.addEventListener("visibilitychange", function () {
+  try {
+    if (document.hidden) {
+      clearUi();
+      if (sDeviceFamily === "Samsung") {
+        stopVideo();
+        webapis.avplay.suspend();
+
+        bProtectionUnlocked = false;
+        body.classList.remove("unlocked");
+      }
+    } else {
+      if (sDeviceFamily === "Samsung") {
+        webapis.avplay.restore();
+        if (iCurrentChannel && webapis.avplay.getState() !== "PLAYING") {
+          debug("load last channel");
+          var iLastCh = iCurrentChannel;
+          iCurrentChannel = false;
+          loadChannel(iLastCh);
+        }
+      }
+    }
+  } catch (e) {
+    debugError(e);
+  }
+});
+}
+
+function buildNav(bSkipCurrentChannelSelect) {
+var bSkipCurrentChannelSelect = bSkipCurrentChannelSelect || false,
+  aGroups = {},
+  sListPoints = "",
+  sGroupListPoints = "",
+  iChCount = 0,
+  sActiveClass = "",
+  iChannelsCount = aActiveChannelList.length;
+
+if (!sPlaylistNav) {
+  sPlaylistNav = '<li id="current_playlist">No playlists yet!</li>';
+}
+
+sActiveClass = sSelectedGroup === "__fav" ? 'class="active"' : "";
+sGroupListPoints +=
+  '<li id="favourites_group" ' +
+  sActiveClass +
+  ' data-group="__fav" class="i18n" data-langid="favourites" data-prev="category_list">' +
+  getLang("favourites") +
+  "</li>";
+
+sActiveClass =
+  !sSelectedGroup || sSelectedGroup === "__all" ? 'class="active"' : "";
+sGroupListPoints +=
+  '<li id="all_channels_group" ' +
+  sActiveClass +
+  ' data-group="__all" class="i18n" data-langid="allChannels">' +
+  getLang("allChannels") +
+  "</li>";
+
+aFilteredChannelList = [];
+aChannelOrder = [];
+aLazyLoadedChannels = [];
+aLazyLoadedEpgChannels = [];
+iVisibleChannels = 0;
+iFavChannels = 0;
+bPlaylistHasFavs = false;
+
+for (var i = 0; i < iChannelsCount; i++) {
+  var oChannel = aActiveChannelList[i];
+
+  if (!oChannel) {
+    continue;
+  }
+  if (oChannel.protect && !bProtectionUnlocked && bHideProtected) {
+    continue;
+  }
+
+  iChCount++;
+
+  oChannel.order = null;
+
+  if (sFilterCategory && oChannel.type && sFilterCategory !== oChannel.type) {
+    continue;
+  }
+
+  var sName = oChannel.name,
+    sGroup = oChannel.group,
+    aChannelGroups = false;
+
+  if (sGroup && sGroup.indexOf(";") > 1) {
+    aChannelGroups = sGroup.split(";");
+    aChannelGroups.forEach(function (sGr) {
+      if (typeof aGroups[sGr] === "undefined") {
+        aGroups[sGr] = 0;
+      }
+    });
+  } else {
+    if (typeof aGroups[sGroup] === "undefined") {
+      aGroups[sGroup] = 0;
+    }
+  }
+
+  if (!bPlaylistHasFavs && isFavourite(i)) {
+    bPlaylistHasFavs = true;
+  }
+
+  if (
+    sFilter &&
+    sGroup &&
+    sName.toLowerCase().indexOf(sFilter) === -1 &&
+    sGroup.toLowerCase().indexOf(sFilter) === -1
+  ) {
+    continue;
+  }
+
+  if (aChannelGroups) {
+    aChannelGroups.forEach(function (sGr) {
+      aGroups[sGr]++;
+    });
+  } else {
+    aGroups[sGroup]++;
+  }
+
+  var bIsFav = bPlaylistHasFavs && isFavourite(i);
+  if (bIsFav) {
+    iFavChannels++;
+  }
+
+  if (sSelectedGroup === "__fav") {
+    if (!bIsFav) {
+      continue;
+    }
+  } else if (sSelectedGroup === "__all") {
+  } else if (sSelectedGroup) {
+    var bFound = false;
+    if (aChannelGroups) {
+      aChannelGroups.forEach(function (sGr) {
+        if (sSelectedGroup === sGr) {
+          bFound = true;
+        }
+      });
+    } else {
+      bFound = sSelectedGroup === sGroup;
+    }
+
+    if (!bFound) {
+      continue;
+    }
+  }
+
+  if (iCurrentChannel == i) {
+    iScrollToActiveChannel = iVisibleChannels;
+  }
+
+  aFilteredChannelList[i] = iVisibleChannels;
+  aChannelOrder[iVisibleChannels] = i;
+  oChannel.order = iVisibleChannels;
+  iVisibleChannels++;
+}
+
+for (var sKey in aGroups) {
+  sActiveClass = sSelectedGroup === sKey ? 'class="active"' : "";
+  sGroupListPoints +=
+    '<li id="nav_gr_' +
+    sKey +
+    '" ' +
+    sActiveClass +
+    ' data-group="' +
+    sKey +
+    '">' +
+    sKey +
+    " (" +
+    aGroups[sKey] +
+    ")</li>";
+}
+
+if (sFilter && iVisibleChannels == 0) {
+  sListPoints +=
+    '<li id="no_channels_filter_hint">' +
+    getLang("filter-no-results") +
+    "</li>";
+}
+
+iChannelListHeight = iNavChannelHeight * iVisibleChannels;
+oChannelListUl.style.height = iChannelListHeight + "px";
+oChannelListUl.innerHTML = sListPoints;
+getEl("dynamic_groups_list").innerHTML = sGroupListPoints;
+getEl("dynamic_playlists_list").innerHTML = sPlaylistNav;
+
+if (!bSkipCurrentChannelSelect) {
+  selectNavChannel();
+}
+
+if (bNavOpened) {
+  bEpgNavListBuilt = false;
+  buildEpgNavList();
+  syncScrollEpgList(oChannelList);
+}
+
+channelScrollEvent();
+}
+
+function getNavChannel(i) {
+var oChannel = getEl("nav_ch_" + i);
+if (!oChannel) {
+  oChannel = lazyLoadChannel(i);
+}
+
+return oChannel;
+}
+
+function recreateNavChannel(i) {
+var oChannel = getEl("nav_ch_" + i);
+if (oChannel) {
+  var bWasSelected = oChannel.classList.contains("selected");
+  oChannel.remove();
+  oChannel = createNavChannel(i);
+  if (bWasSelected) {
+    oChannel.classList.add("selected");
+  }
+  if (!aLazyLoadedChannels.includes(i)) {
+    aLazyLoadedChannels.push(i);
+  }
+}
+return oChannel;
+}
+
+function getChannelHtml(iChNum, sTitleId) {
+var aCurChannel = aActiveChannelList[iChNum],
+  sName = aCurChannel.cname ? aCurChannel.cname : aCurChannel.name;
+if (!aCurChannel || !sName) {
+  return "";
+}
+
+var sEditAttributes = "";
+if (sTitleId) {
+  sEditAttributes =
+    ' id="' + sTitleId + '" onclick="showRenameInput(' + iChNum + ');" ';
+}
+
+var sHtml =
+  '<span class="list-ch">' +
+  (iChNum + 1) +
+  "</span> <span " +
+  sEditAttributes +
+  ' class="list-title">' +
+  sName +
+  "</span>";
+
+if (aCurChannel.x_series_id && aCurChannel.type === "series") {
+  sHtml += '<div class="nav_logo icon icon-series"></div>';
+} else if (aCurChannel.x_stream_id && aCurChannel.type === "movie") {
+  sHtml += '<div class="nav_logo icon icon-movies"></div>';
+} else if (typeof aCurChannel.logo === "string") {
+  sHtml +=
+    '<div class="nav_logo"><img src="' +
+    aCurChannel.logo +
+    '" alt="" /></div>';
+}
+
+return sHtml;
+}
+
+function createNavChannel(i) {
+var aCurChannel = aActiveChannelList[i];
+if (!aCurChannel || !aCurChannel.name || aCurChannel.deleted) {
+  return false;
+}
+
+var iOrderNum = aCurChannel.order;
+if (typeof iOrderNum !== "number") {
+  return false;
+}
+
+var oChannel = document.createElement("li");
+oChannel.id = "nav_ch_" + i;
+oChannel.dataset.channelnum = i;
+oChannel.innerHTML = getChannelHtml(i);
+oChannel.style.top = iOrderNum * iNavChannelHeight + "px";
+oChannel.dataset.order = iOrderNum;
+oChannel.onmouseenter = function () {
+  focusListItem(this);
+};
+
+if (iCurrentChannel == i) {
+  oChannel.className = "active";
+}
+
+if (aCurChannel.protect) {
+  oChannel.classList.add("protected");
+  if (!bProtectionUnlocked && bHideProtected) {
+    oChannel.classList.add("invisible");
+    return oChannel;
+  }
+}
+
+if (isFavourite(i)) {
+  oChannel.classList.add("fav");
+}
+
+if (aCurChannel.x_series_id && aCurChannel.type === "series") {
+  oChannel.classList.add("series");
+} else if (aCurChannel.x_stream_id && aCurChannel.type === "movie") {
+  oChannel.classList.add("movie");
+}
+
+oChannelListUl.appendChild(oChannel);
+
+return oChannel;
+}
+
+function lazyLoadChannel(iChNum) {
+iChNum = parseInt(iChNum);
+
+if (aLazyLoadedChannels.includes(iChNum) || !aActiveChannelList[iChNum]) {
+  return false;
+}
+
+if (aLazyLoadedChannels.length > 100) {
+  bNeedNavRefresh = true;
+}
+
+aLazyLoadedChannels.push(iChNum);
+return createNavChannel(iChNum);
+}
+
+function calculateScrollbarTop(scrollTop, boxHeight, contentHeight) {
+var maxScrollTop = contentHeight - boxHeight;
+if (scrollTop > maxScrollTop) scrollTop = maxScrollTop;
+return (scrollTop / maxScrollTop) * (boxHeight - 50);
+}
+
+function channelScrollEvent() {
+syncScrollEpgList(oChannelList);
+
+var iTop = oChannelList.scrollTop,
+  iChannelBoxHeight = oChannelList.offsetHeight,
+  iVisibleChannelTop = Math.floor(iTop / iNavChannelHeight),
+  iVisibleChannelBottom = (iTop + iChannelBoxHeight + 10) / iNavChannelHeight;
+
+if (iVisibleChannelBottom && aChannelOrder) {
+  if (iVisibleChannelBottom < 8) {
+    iVisibleChannelBottom = 8;
+  }
+
+  for (var i = iVisibleChannelTop; i < iVisibleChannelBottom; i++) {
+    if (aChannelOrder[i] >= 0) {
+      lazyLoadChannel(aChannelOrder[i]);
+      lazyLoadEpgNavChannel(aChannelOrder[i]);
+    }
+  }
+}
+}
+
+function selectNavChannel(iForceChannel) {
+iForceChannel = iForceChannel || iCurrentChannel;
+var oNavChannel = getNavChannel(iForceChannel);
+
+if (!oNavChannel) {
+  oNavChannel = getNavChannel(aChannelOrder[0]);
+  if (!oNavChannel) {
+    oNavChannel = document.querySelector("#channel_list li:first-child");
+  }
+}
+
+if (oNavChannel) {
+  oSelectedItem = oNavChannel;
+  oNavChannel.classList.add("selected");
+  scrollToListItem(oNavChannel);
+}
+}
+
+function getChannelKey(iChNum) {
+var oCh = aActiveChannelList[iChNum];
+return oCh ? oCh.name + "|" + oCh.tvgid + "|" + oCh.tvgn : false;
+}
+
+function getFavourites() {
+if (!aFavourites) {
+  aFavourites = localStorage.getItem("aFavourites");
+  if (!aFavourites) {
+    aFavourites = {};
+  } else {
+    aFavourites = JSON.parse(aFavourites);
+  }
+}
+return aFavourites;
+}
+
+function setFavourite(iChNum) {
+var aFavTmp = getFavourites(),
+  sKey = getChannelKey(iChNum);
+
+if (sKey) {
+  aFavTmp[sKey] = 1;
+}
+
+aFavourites = aFavTmp;
+localStorage.setItem("aFavourites", JSON.stringify(aFavourites));
+
+var oNavChannel = getNavChannel(iChNum);
+if (oNavChannel) {
+  oNavChannel.classList.add("fav");
+}
+
+if (
+  !bNavOpened &&
+  !bChannelSettingsOpened &&
+  iContextMenuEditChannel === false
+) {
+  showChannelName();
+}
+}
+
+function removeFavourite(iChNum) {
+var aFavTmp = getFavourites(),
+  sKey = getChannelKey(iChNum);
+
+if (sKey && aFavTmp && aFavTmp[sKey]) {
+  delete aFavTmp[sKey];
+  aFavourites = aFavTmp;
+  localStorage.setItem("aFavourites", JSON.stringify(aFavourites));
+
+  var oNavChannel = getNavChannel(iChNum);
+  if (oNavChannel) {
+    oNavChannel.classList.remove("fav");
+  }
+}
+
+if (
+  !bNavOpened &&
+  !bChannelSettingsOpened &&
+  iContextMenuEditChannel === false
+) {
+  showChannelName();
+}
+}
+
+function countFavChannels() {
+iFavChannels = 0;
+bPlaylistHasFavs = false;
+var iChannelsCount = aActiveChannelList.length;
+for (var i = 0; i < iChannelsCount; i++) {
+  if (isFavourite(i)) {
+    iFavChannels++;
+    bPlaylistHasFavs = true;
+  }
+}
+
+return iFavChannels;
+}
+
+function getFavsCount() {
+if (iFavChannels === false) {
+  iFavChannels = countFavChannels();
+}
+
+return iFavChannels;
+}
+
+function isFavourite(iChNum) {
+var aFavTmp = getFavourites(),
+  sKey = getChannelKey(iChNum);
+return (
+  sKey && aFavTmp && typeof aFavTmp[sKey] !== "undefined" && aFavTmp[sKey]
+);
+}
+
+function toggleFavourite(iChNum) {
+if (iChNum === "FROMLIST") {
+  var oSelected = document.querySelector("#channel_list li.selected");
+  if (oSelected && oSelected.dataset.channelnum) {
+    iChNum = oSelected.dataset.channelnum;
+  }
+  if (!iChNum) {
+    return false;
+  }
+}
+
+var bFavAdded = false;
+
+if (isFavourite(iChNum)) {
+  removeFavourite(iChNum);
+} else {
+  setFavourite(iChNum);
+  bFavAdded = true;
+}
+
+bNeedNavRefresh = true;
+iFavChannels = false;
+
+refreshFavStatus();
+
+if (iChNum == iCurrentChannel) {
+  if (bChannelSettingsOpened || iContextMenuEditChannel !== false) {
+  } else if (!bNavOpened) {
+    showChannelName();
+  }
+}
+
+if (bNavOpened && sSelectedGroup === "__fav") {
+  if (!getFavsCount()) {
+    removeGroupFilter();
+  }
+
+  buildNav();
+}
+
+return bFavAdded;
+}
+
+function showSubtitles() {
+if (sDeviceFamily === "Android") {
+  m3uConnector.showSubtitlesView();
+  hideChannelSettings();
+  return true;
+}
+
+if (!bSubtitlesActive) {
+  bSubtitlesActive = true;
+  document.body.classList.add("sub-enabled");
+  switch (sDeviceFamily) {
+    case "Browser":
+    case "LG":
+      if (sCurrentVideoEngine === "dash") {
+        oDashApi.enableText(bSubtitlesActive);
+      } else {
+        oHlsApi.subtitleDisplay = bSubtitlesActive;
+      }
+
+      getEl("cs_subtitles").classList.add("active");
+      break;
+    case "Samsung":
+      getEl("subtitles").innerHTML = "";
+      break;
+    case "Android":
+      m3uConnector.enableSubtitles();
+      break;
+  }
+}
+}
+
+function hideSubtitles() {
+if (bSubtitlesActive) {
+  bSubtitlesActive = false;
+  document.body.classList.remove("sub-enabled");
+  switch (sDeviceFamily) {
+    case "Browser":
+    case "LG":
+      if (sCurrentVideoEngine === "dash") {
+        oDashApi.enableText(bSubtitlesActive);
+      } else {
+        oHlsApi.subtitleDisplay = bSubtitlesActive;
+      }
+      getEl("cs_subtitles").classList.remove("active");
+      break;
+    case "Samsung":
+      getEl("subtitles").innerHTML = "";
+      break;
+    case "Android":
+      m3uConnector.disableSubtitles();
+      break;
+  }
+}
+}
+
+function toggleSubtitles() {
+if (bSubtitlesActive) {
+  hideSubtitles();
+} else {
+  showSubtitles();
+}
+}
+
+function toggleAudio() {
+if (sDeviceFamily === "Android") {
+  m3uConnector.showAudioTrackView();
+  hideChannelSettings();
+  return true;
+}
+}
+
+function toggleVideo() {
+if (sDeviceFamily === "Android") {
+  m3uConnector.showVideoTrackView();
+  hideChannelSettings();
+  return true;
+}
+}
+
+function enableChannelMoveMode(iCh) {
+if (bMoveChannelFieldActive) {
+  return;
+}
+
+bMoveChannelFieldActive = true;
+
+if (!bNavOpened) {
+  showNav();
+}
+
+hideContextMenu();
+
+oNavMoveChannel = getNavChannel(iCh);
+if (oNavMoveChannel) {
+  oNavMoveChannel.classList.add("move-channel");
+
+  if (!oMoveChannelInput) {
+    oMoveChannelInput = document.createElement("input");
+    oMoveChannelInput.id = "input_move_field";
+    oMoveChannelInput.type = "number";
+    oMoveChannelInput.min = 0;
+    oMoveChannelInput.max = aActiveChannelList.length;
+    oMoveChannelInput.autocomplete = "off";
+  }
+
+  oNavMoveChannel.insertBefore(oMoveChannelInput, oNavMoveChannel.firstChild);
+
+  oMoveChannelInput.value = iCh + 1;
+  oMoveChannelInput.onblur = function () {
+    moveChannelPos(0);
+  };
+
+  oMoveChannelInput.focus();
+}
+}
+
+function moveChannelPos(iDir) {
+var iNewPos = parseInt(oMoveChannelInput.value);
+
+if (iDir == 1) {
+  iNewPos++;
+  if (iNewPos > aActiveChannelList.length) {
+    return;
+  }
+  oMoveChannelInput.value = iNewPos;
+} else if (iDir == -1) {
+  iNewPos--;
+  if (iNewPos < 0) {
+    return;
+  }
+  oMoveChannelInput.value = iNewPos;
+} else {
+  var iCh = oNavMoveChannel.dataset.channelnum,
+    oCh = aActiveChannelList[iCh];
+  if (oCh) {
+    if (oCh.fpos) {
+    }
+
+    oCh.fpos = iNewPos - 1;
+    oCh.fposDate = new Date().getTime();
+    saveChannel(oCh, function () {
+      hideChannelPosInput();
+      if (bNavOpened) {
+        buildNav(true);
+        selectNavChannel(iNewPos - 1);
+      }
+    });
+  }
+}
+}
+
+function hideChannelPosInput() {
+if (oNavMoveChannel) {
+  oNavMoveChannel.classList.remove("move-channel");
+}
+
+if (oMoveChannelInput) {
+  oMoveChannelInput.blur();
+  oMoveChannelInput.remove();
+}
+
+bMoveChannelFieldActive = false;
+}
+
+var bRenameFieldActive = false,
+oRenameItem = false;
+function showRenameInput(iCh) {
+if (bRenameFieldActive) {
+  return;
+}
+
+if (!oRenameItem) {
+  oRenameItem = document.createElement("input");
+  oRenameItem.id = "input_editor_field";
+  oRenameItem.type = "text";
+  oRenameItem.className = "text";
+  oRenameItem.autocomplete = "off";
+}
+
+var oCh = aActiveChannelList[iCh];
+oRenameItem.value = oCh.cname ? oCh.cname : oCh.name;
+oRenameItem.dataset.chNum = iCh;
+
+bRenameFieldActive = true;
+var oRenameNavItem = getEl("context_menu_title");
+if (oRenameNavItem) {
+  oRenameNavItem.innerHTML = "";
+  oRenameNavItem.appendChild(oRenameItem);
+}
+
+oRenameItem.onblur = function () {
+  renameChannel();
+};
+oRenameItem.focus();
+}
+
+function renameChannel() {
+if (!oRenameItem) {
+  hideRenameInput();
+  return;
+}
+if (!bRenameFieldActive) {
+  return;
+}
+
+var sNewName = oRenameItem.value,
+  iCh = oRenameItem.dataset.chNum,
+  oCh = aActiveChannelList[iCh];
+if (!sNewName) {
+  sNewName = oCh.name;
+}
+
+if (sNewName && oCh && sNewName !== oCh.cname) {
+  oCh.cname = sNewName;
+  saveChannel(oCh);
+  iCh = parseInt(iCh);
+
+  bChannelNameGenerated = false;
+  bNeedNavRefresh = true;
+  if (iCh === iCurrentChannel) {
+    sCurrentChannelName = sNewName;
+  }
+  recreateNavChannel(iCh);
+}
+
+hideRenameInput(sNewName);
+}
+
+function hideRenameInput(sNewName) {
+defocus();
+
+oRenameItem = false;
+
+if (sNewName) {
+  getEl("context_menu_title").innerText = sNewName;
+}
+
+bRenameFieldActive = false;
+}
+
+var sProtectionPassword = false,
+sProtectionInputActive = false;
+function checkProtectionPw(sInput) {
+if (sProtectionPassword && sInput == sProtectionPassword) {
+  toggleProtectionLock(true);
+  switch (sProtectionInputActive) {
+    case "channelload":
+      loadAndPlayChannelUrl();
+      break;
+    case "toggle":
+      if (bGroupsOpened) {
+      }
+      break;
+    default:
+  }
+
+  hideProtectionInput();
+}
+}
+
+function showProtectionInput(sOrigin) {
+if (!sProtectionPassword) {
+  showModal(getLang("no-password-yet"));
+  return false;
+}
+
+if (iChannelNameTimer) {
+  clearTimeout(iChannelNameTimer);
+}
+
+sProtectionInputActive = sOrigin;
+
+var oPasswordConfirmInput = getEl("password_confirm_input");
+oPasswordConfirmInput.value = "";
+showElement("password_confirm");
+}
+
+function hideProtectionInput() {
+if (sProtectionInputActive !== false) {
+  sProtectionInputActive = false;
+  hideElement("password_confirm");
+}
+}
+
+function toggleProtectionLock(bForceUnlock) {
+if (!bForceUnlock && !bProtectionUnlocked) {
+  showProtectionInput("toggle");
+  return;
+}
+
+if (bForceUnlock) {
+  bProtectionUnlocked = true;
+} else {
+  bProtectionUnlocked = !bProtectionUnlocked;
+}
+
+body.classList.toggle("unlocked", bProtectionUnlocked);
+localStorage.setItem("channelProtection", bProtectionUnlocked);
+
+bNeedNavRefresh = true;
+
+if (bHideProtected && bProtectionUnlocked && bNavOpened) {
+  showNav();
+  if (bGroupsOpened) {
+    hideGroups();
+  }
+}
+}
+
+function toggleDebugger() {
+if (bDebuggerEnabled) {
+  if (bDebuggerActive) {
+    hideElement("debugger");
+  } else {
+    showElement("debugger");
+  }
+  bDebuggerActive = !bDebuggerActive;
+}
+}
+
+function searchChannels(sInput) {
+sFilter = sInput.toLowerCase();
+buildNav();
+return true;
+}
+
+function absoluteOffset(el) {
+var rect = el.getBoundingClientRect(),
+  scrollLeft = window.pageXOffset || document.documentElement.scrollLeft,
+  scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+return { top: rect.top + scrollTop, left: rect.left + scrollLeft };
+}
+
+function bootEverything() {
+bIsBooting = true;
+
+if (!isReadyForPlay()) {
+  openSettings();
+  return false;
+}
+
+try {
+  boot();
+} catch (e) {
+  debugError(e);
+}
+
+var iResizeTimeout = false;
+window.addEventListener("resize", function () {
+  if (bNavOpened) {
+    clearTimeout(iResizeTimeout);
+    iResizeTimeout = setTimeout(channelScrollEvent, 100);
+  }
+});
+
+bIsBooting = false;
+}
+
+var bAllowAds = true,
+bRewarded = false,
+bAdPreparationStarted = false,
+bAdReady = false;
+function setAdOnChannelSwitch() {
+bAdReady = false;
+bShowAd = true;
+}
+
+function prepareAd() {
+bRewarded = false;
+bAdPreparationStarted = true;
+
+if (typeof remotePrepareAd === "function") {
+  remotePrepareAd();
+  return true;
+}
+
+if (bAllowAds) {
+  if (
+    sDeviceFamily === "Android" &&
+    typeof m3uConnector.prepareAdmobAd === "function"
+  ) {
+    m3uConnector.prepareAdmobAd();
+    return true;
+  }
+}
+}
+
+function adPrepared() {
+bAdReady = true;
+getEl("play_ad_button").classList.remove("ad-loading");
+}
+
+function adRewarded() {
+bRewarded = true;
+if (typeof remoteAdRewarded === "function") {
+  remoteAdRewarded();
+  return true;
+}
+}
+
+function onAdImpression() {
+if (typeof remoteOnAdImpression === "function") {
+  remoteOnAdImpression();
+}
+}
+
+function showRewardedAdConsent() {
+bAdConsentOpened = true;
+getEl("play_ad_button").classList.add("ad-loading");
+document.body.classList.add("ad-consent");
+hideChannelName();
+prepareAd();
+}
+
+function hideRewardedAdConsent() {
+bAdConsentOpened = false;
+document.body.classList.remove("ad-consent");
+}
+
+function stopAdsPremium() {
+hideRewardedAdConsent();
+disableAdsPremium();
+adFinishCallback();
+pickPlaylistSelector(oPlaylistNavSelector.firstElementChild, true);
+
+if (typeof remoteStopAdsPremium === "function") {
+  remoteStopAdsPremium();
+}
+}
+
+function playAd() {
+if (!bAdReady) {
+  showModal(getLang("adNotReadyYet"));
+  return false;
+}
+
+hideRewardedAdConsent();
+
+if (typeof remotePlayAd === "function") {
+  remotePlayAd();
+  return true;
+}
+
+if (bAllowAds) {
+  if (
+    sDeviceFamily === "Android" &&
+    typeof m3uConnector.displayAdmobAd === "function"
+  ) {
+    m3uConnector.displayAdmobAd();
+    return true;
+  }
+}
+
+adWasCanceled(
+  "The ad server is currently unavailable. Please try again later."
+);
+}
+
+function adFinishCallback() {
+bShowAd = false;
+showChannelName();
+loadAndPlayChannelUrl();
+
+if (typeof remoteAdFinishCallback === "function") {
+  remoteAdFinishCallback();
+}
+}
+
+function adWasCanceled(sReason) {
+hideRewardedAdConsent();
+disableAdsPremium();
+bShowAd = false;
+showModal(
+  "Ad Premium was aborted. Reason: " +
+    sReason +
+    ". To proceed, please activate Ads Premium again in the settings."
+);
+adFinishCallback();
+
+if (typeof remoteAdCanceled === "function") {
+  remoteAdCanceled(sReason);
+}
+}
+
+function consentErrorCallback(sReason) {
+adWasCanceled(sReason);
+if (typeof remoteConsentErrorCallback === "function") {
+  remoteConsentErrorCallback(sReason);
+}
+}
+
+function isReadyForPlay() {
+return localStorage.getItem("bReadyForPlay") === "1";
+}
+
+function bootPlayerView() {
+applyLang();
+bootEverything();
+}
+
+function premiumTrialEnded() {
+return false;
+}
+
+function clockTimer() {
+var oDateNow = new Date();
+var sTime = getTimeString(oDateNow, {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+oClock.innerHTML = sTime;
+}
+
+function initClock() {
+if (AppSettings.isActive("clock-always-visible")) {
+  oClock.classList.add("force-visible");
+}
+
+switch (AppSettings.getSetting("clock-position")) {
+  case "Bottom Left":
+    oClock.classList.add("bottom-left");
+    break;
+  case "Top Left":
+    oClock.classList.add("top-left");
+    break;
+  case "Bottom Right":
+    oClock.classList.add("bottom-right");
+    break;
+  case "Top Right":
+  default:
+    oClock.classList.add("top-right");
+}
+
+var sClockSize = AppSettings.getSetting("clock-size");
+if (sClockSize) {
+  oClock.style.fontSize = sClockSize;
+}
+
+var bIsPremiumLicense = getLicenseType() === "Premium";
+if (!bIsPremiumLicense) {
+  iTrialSecondsLeft = localStorage.getItem("iTrialPremiumTime");
+  iSecondsUntilAd = localStorage.getItem("iSecondsUntilAd");
+
+  if (iTrialSecondsLeft) {
+    iTrialSecondsLeft = parseInt(iTrialSecondsLeft);
+  } else {
+    iTrialSecondsLeft = 0;
+  }
+
+  if (iSecondsUntilAd) {
+    iSecondsUntilAd = parseInt(iSecondsUntilAd);
+  } else {
+    iSecondsUntilAd = 5;
+  }
+}
+
+clockTimer();
+setInterval(function () {
+  clockTimer();
+
+  if (!bIsPremiumLicense && !bShowAd) {
+    if (bAdsPremiumActive) {
+      if (iSecondsUntilAd < 1) {
+        iSecondsUntilAd = 3600;
+        setAdOnChannelSwitch();
+      } else {
+        iSecondsUntilAd -= 5;
+        localStorage.setItem("iSecondsUntilAd", iSecondsUntilAd);
+      }
+    } else if (iTrialSecondsLeft > 0) {
+      iTrialSecondsLeft -= 5;
+
+      if (iTrialSecondsLeft > 0) {
+        localStorage.setItem("iTrialPremiumTime", iTrialSecondsLeft);
+      } else {
+        if (premiumTrialEnded()) {
+          pickPlaylistSelector(oPlaylistNavSelector.firstElementChild, true);
+        }
+        localStorage.removeItem("iTrialPremiumTime");
+        iTrialSecondsLeft = 0;
+      }
+    }
+  }
+
+  iSecondsSinceEpgNavListRefresh += 5;
+  iSecondsSinceEpgOverviewRefresh += 5;
+  iSecondsSinceEpgChannelRefresh += 5;
+
+  if (
+    bNavOpened &&
+    (iSecondsSinceEpgNavListRefresh > 60 || bEpgDownloadRunning)
+  ) {
+    refreshEpgNavList();
+  }
+
+  if (sLoadingFromDb && iSecondsSinceEpgChannelRefresh > 15) {
+    iSecondsSinceEpgChannelRefresh = 0;
+    updateChannelNameEpg();
+  }
+}, 5000);
+
+setInterval(function () {
+  iUtcArchiveStarted++;
+  iArchiveCurrentTime++;
+}, 1000);
+}
