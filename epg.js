@@ -1,13 +1,3 @@
-/*
-
-	Copyright 2025 - Herber eDevelopment - Jaroslav Herber
-	All rights reserved.
-
-	This code is proprietary and confidential.
-	Copying, modification, distribution, or use of this code without explicit permission is strictly prohibited.
-
-*/
-
 var bEpgEnabled = false,
   bIsLoadingEpgSources = false,
   bEpgDownloadRunning = false,
@@ -121,7 +111,6 @@ function isEpgOutdated(sLastUpdateTime) {
       var sLastDownloadDate = new Date(
         parseInt(sLastUpdateTime)
       ).toLocaleString();
-      //debug('no EPG download needed. Last download was on ' + sLastDownloadDate);
     }
     return bIsOutdated;
   }
@@ -137,7 +126,6 @@ function downloadQueuedEpgSources() {
   }
 
   iEpgQueueTimer = setInterval(function () {
-    //debug("EpgQueueTimer");
     if (!bEpgDownloadRunning && aLoadedEpgSources) {
       for (var i in aLoadedEpgSources) {
         if (!bEpgDownloadRunning && aLoadedEpgSources[i].queue) {
@@ -157,8 +145,6 @@ function setEpgToQueue(oEpg, bQueue) {
   }
 
   bQueue ? iQueueCount++ : iQueueCount--;
-
-  //console.log('queue count: ' + iQueueCount);
 
   oEpg.queue = bQueue;
   downloadQueuedEpgSources(); // start listener for queued EPGs
@@ -186,9 +172,7 @@ function downloadEpgManager(oEpg) {
   }
 
   if (!bNeedEpgUpdate) {
-    //showElement('epg_activator');
     bEpgLoaded = true;
-    //document.body.classList.add('epg-loaded');
     bEpgDownloadRunning = false;
 
     setEpgToQueue(oEpg, false);
@@ -200,8 +184,6 @@ function downloadEpgManager(oEpg) {
     return false;
   }
 
-  //document.body.classList.remove('epg-loaded');
-  //oEpgDownloadStatus.innerText = getLang('epgIsDownloading') + '...';
   oEpgDownloadStatus.innerHTML = "";
   oEpgDownloadStatus.className = "e-loading";
 
@@ -244,14 +226,12 @@ function downloadEpgManager(oEpg) {
       if (sResponseText) {
         var sStatus = getWorkerStatus(sResponseText, "Download progress: ");
         if (sStatus) {
-          // progress download
           oEpgDownloadStatus.innerHTML = sLangDownloadedBytes + sStatus + " KB";
           return true;
         }
 
         var sStatus = getWorkerStatus(sResponseText, "OK channels: ");
         if (sStatus) {
-          // progress importing channels
           oEpg.channels = parseInt(sStatus);
           oEpgDownloadStatus.innerHTML = sChannelsProcessed + sStatus;
           return true;
@@ -265,13 +245,11 @@ function downloadEpgManager(oEpg) {
           return true;
         }
 
-        // Errors
         var sStatus = getWorkerStatus(sResponseText, "ERROR: ");
         if (sStatus) {
           if (sStatus === "Not enough space") {
             showModal(getLang("epgQuotaExceededError"));
           } else {
-            //showModal(sStatus, oEpg.url);
           }
           oEpg.status = "ERROR";
           oEpg.error = sStatus;
@@ -293,19 +271,16 @@ function downloadEpgManager(oEpg) {
             oEpgDownloadStatus.innerHTML = getLang("deleting-expired");
             break;
           case "channels complete":
-            //loadChannelEpgIds(function() {
             if (bNavOpened) {
               bEpgNavListBuilt = false;
               buildEpgNavList();
             }
             sLoadingFromDb = false;
             loadChannelEpg();
-            //});
 
             break;
           case "finish":
             bEpgLoaded = true;
-            //document.body.classList.add('epg-loaded');
             oEpgDownloadStatus.innerHTML = "";
 
             oEpg.status = "OK";
@@ -313,7 +288,6 @@ function downloadEpgManager(oEpg) {
             saveCurrentEpg(oEpg);
             epgDownLoadFinished();
 
-            //if( !iQueueCount ) {
             if (bNavOpened) {
               bEpgNavListBuilt = false;
               buildEpgNavList();
@@ -321,8 +295,6 @@ function downloadEpgManager(oEpg) {
 
             sLoadingFromDb = false;
             loadChannelEpg();
-
-            //}
 
             if (bEpgOverviewOpened) {
               buildEpgOverview();
@@ -367,11 +339,9 @@ function saveCurrentEpg(oEpg, sCallback) {
 }
 
 function epgItemClick(oEl, oEv) {
-  // Zoom image
   if (oEv.target.classList.contains("p-icon")) {
     oEl.classList.toggle("p-zoom");
   } else {
-    // Remove previous click-classes from other epg-items
     var oItems = document.getElementsByClassName("p-item");
     if (oItems) {
       [].forEach.call(oItems, function (oItem) {
@@ -381,7 +351,6 @@ function epgItemClick(oEl, oEv) {
       });
     }
 
-    // Open extended channel info
     if (oEl.classList.contains("short")) {
       oEl.classList.toggle("active");
     }
@@ -404,20 +373,17 @@ function setSmartEpg() {
     sCurrentChannelName +
     "</span>";
 
-  // Show EPG-data
   oSmartEpgCurrent.appendChild(oChannelEpg);
   if (aCurrentProgram && aCurrentProgram.id) {
     var sLiveStatus = "";
     if (aArchiveData) {
-      sLiveStatus = "arch"; //'<span class="arch">Archive</span> ';
+      sLiveStatus = "arch";
     } else if (isLive()) {
-      sLiveStatus = "live"; //'<span class="live">Live</span> ';
+      sLiveStatus = "live";
     }
 
     oSmartEpgCurrent.className = sLiveStatus;
-    //oSmartEpg.classList.add('show');
   } else {
-    //oSmartEpg.classList.remove('show');
   }
 
   var oSmartEpgChannel = getEl("smart_epg_channel");
@@ -436,7 +402,6 @@ function setSmartEpg() {
 function createChannelEpgProgram(iPos) {
   var oProgram = aChannelEpgCache[iPos];
 
-  // Should be save like in epg-overview.js
   if (oProgram) {
     if (oProgram.created) {
       return getEl("p_pos_" + iPos);
@@ -548,7 +513,6 @@ function createChannelEpgProgram(iPos) {
       oEl.classList.add("p-arch");
     }
 
-    // Channel has own defined catchup type
     if (oProgram.catchup && oProgram.catchup.type) {
       oEl.dataset.catchup = oProgram.catchup.type;
     }
@@ -581,7 +545,6 @@ function updateChannelNameEpg(oProgram) {
 
   if (!bJumpNext && iElapsedPct >= 100) {
     bJumpNext = true; // prevent loop
-    // Switch to next channel
     iChannelEpgLivePos++;
     updateChannelNameEpg();
   } else {
@@ -599,7 +562,6 @@ function updateChannelNameEpg(oProgram) {
   }
 }
 
-// 1 = program available, 0 = loading, -1 not available
 var iEpgLoadStatus = 0;
 function setEpgLoadStatus(iStatus) {
   iEpgLoadStatus = iStatus;
@@ -705,14 +667,10 @@ function loadChannelEpg(bLoadArchiveData) {
 
   if (!bEpgLoaded) {
     setEpgLoadStatus(0);
-
-    //oSmartEpgCurrent.innerHTML = getLang('loading');
-    //oEpgChannelContent.innerHTML = getLang('loading');
     return false;
   }
 
   if (!sLoadingFromDb) {
-    // Reset cache vars
     aCurrentProgram = {};
     aChannelEpgCache = [];
     iChannelEpgLivePos = false;
@@ -763,15 +721,6 @@ function loadChannelEpg(bLoadArchiveData) {
         oRange = IDBKeyRange.only(sEpgId),
         oRequest = oIndex.getAll(oRange);
 
-      /*
-			var sDisplayName = aCurrentEpgChannel.name, sIconUrl = aCurrentEpgChannel.logo;
-			var sEpgHtml = '<div class="epg-chno">' + iReferredChannel + '</div>';
-			if( sIconUrl ) {
-				sEpgHtml += '<div class="epg-icon-container"><img class="epg-icon" src="' + sIconUrl + '"></div>';
-			} else if( sDisplayName ) {
-				sEpgHtml = '<h2 class="epg-title">' + sDisplayName + '</h2>';
-			}*/
-
       var oCatchup = aCurrentChannel.catchup;
       if (oCatchup) {
         iCatchupDays = oCatchup.days;
@@ -787,11 +736,10 @@ function loadChannelEpg(bLoadArchiveData) {
 
       oRequest.chNum = iChNum;
 
-      // Load programs
       oRequest.onsuccess = function (event) {
         if (this.chNum !== iCurrentChannel) {
           console.log("abort loading EPG");
-          return false; // Abort loading if channel changed
+          return false;
         }
 
         var aRecords = event.target.result;
@@ -806,11 +754,9 @@ function loadChannelEpg(bLoadArchiveData) {
         for (var i = 0; i < iMaxProgramCount; i++) {
           var oProgram = aRecords[i];
 
-          // Check time
           var oStartTime = getEpgDateObject(oProgram.start),
             oEndTime = getEpgDateObject(oProgram.stop);
           if (!oStartTime || !oEndTime) {
-            //oRecord.continue();
             continue;
           }
 
@@ -819,7 +765,6 @@ function loadChannelEpg(bLoadArchiveData) {
 
           oProgram.catchup = oCatchup;
 
-          // For catchup
           if (
             oEarliestCatchupDate &&
             oStartTime > oEarliestCatchupDate &&
@@ -839,7 +784,6 @@ function loadChannelEpg(bLoadArchiveData) {
           oProgram.startTs = iStart;
           oProgram.endTs = iEnd;
 
-          // Current program in channel info
           var iDuration = getProgramDuration(oStartTime, oEndTime);
           if (iStart < iDateNow && iDateNow < iEnd) {
             iLivePos = i;
@@ -848,7 +792,6 @@ function loadChannelEpg(bLoadArchiveData) {
               ((iDateNow - iStart) / (iEnd - iStart)) * 100
             );
 
-            // Is other archive program playing now?
             if (
               bLoadArchiveData &&
               aArchiveData &&
@@ -925,8 +868,6 @@ function buildEpgNavList() {
 }
 
 function loadEpgNavChannel(iChNum) {
-  //var sEpgId = getChannelEpgId(aActiveChannelList[iChNum]);
-
   getChannelEpgId(aActiveChannelList[iChNum], function (sEpgId) {
     if (!sEpgId) {
       return false;
@@ -978,7 +919,6 @@ function loadEpgNavChannel(iChNum) {
         var oStartTime = getEpgDateObject(oProgram.start),
           oEndTime = getEpgDateObject(oProgram.stop);
 
-        // expired
         if (iDateNow > oEndTime.getTime()) {
           continue;
         }
@@ -1001,7 +941,6 @@ function loadEpgNavChannel(iChNum) {
               '%)"';
           }
 
-          // Ausgabe
           if (iEpgTimeShift) {
             oStartTime.subHours(iEpgTimeShift);
           }
@@ -1040,9 +979,6 @@ function loadEpgNavChannel(iChNum) {
 }
 
 function loadChannelEpgCallback() {
-  //oEpgChannelContent.innerHTML = '';
-  //hideChannelProgramBrowser();
-  //loadChannelEpg();
 }
 
 function getEpgGrabInterval() {
@@ -1065,7 +1001,6 @@ function initGrabbingInterval() {
 
 function notCompatibleHandler() {
   showModal(getLang("epgNotCompatibleWithPlaylist"));
-  //setEpgEnableSetting(false);
 }
 
 function epgDownLoadFinished() {
@@ -1107,14 +1042,12 @@ function startEgpGrabbing() {
     return false;
   }
 
-  // already in process
   if (bEpgDownloadRunning || bIsBooting) {
     return false;
   }
 
   iCurrentPlaylistId = parseInt(iCurrentPlaylistId);
 
-  // Get EPG
   loadEpgSources(function () {
     document.body.classList.add("epg-loaded");
 
@@ -1130,15 +1063,9 @@ function startEgpGrabbing() {
     sLoadingFromDb = false;
     loadChannelEpg();
 
-    // Need reload?
     if (aLoadedEpgSources) {
       for (var i in aLoadedEpgSources) {
-        /*if( aLoadedEpgSources[i].pid && aLoadedEpgSources[i].pid !== iCurrentPlaylistId ) {
-					continue;
-				}*/
-
         setEpgToQueue(aLoadedEpgSources[i], true);
-        //downloadEpgManager(aLoadedEpgSources[i]);
       }
     }
   });
@@ -1205,7 +1132,6 @@ function buildEpgOverview() {
     return true;
   }
 
-  // Create iFrame of EPG overview
   oEpgOverviewFrame = document.createElement("iframe");
   oEpgOverviewFrame.id = "epg_overview_frame";
   oEpgOverviewFrame.title = "M3U IPTV EPG";
@@ -1225,16 +1151,6 @@ function toggleEpgOverview() {
 }
 
 function showEpgOverview() {
-  if (!isPremiumAccessAllowed()) {
-    showModal(getLang("license-fail"));
-    return false;
-  }
-
-  /*if( bEpgDownloadRunning ) {
-		showModal(getLang('epg-download-running'));
-		return false;
-	}*/
-
   clearUi("epgOverview");
 
   if (!bEpgEnabled) {
@@ -1248,17 +1164,6 @@ function showEpgOverview() {
   document.body.classList.add("epg-overview");
 
   buildEpgOverview();
-
-  /*try {
-		//oEpgOverview.scrollTop = ((iCurrentChannel - 1) * 49) - 200;
-		var oLastActiveEpgCh = document.querySelector('.e-name.active');
-		if( oLastActiveEpgCh ) {
-			oLastActiveEpgCh.classList.remove('active');
-		}
-		getEl('e-n' + (iCurrentChannel - 1)).classList.add('active');
-	} catch( e ) {
-		debugError(e);
-	}*/
 }
 
 function hideEpgOverview(bRemoveHtml) {
