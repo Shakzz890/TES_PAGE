@@ -1,13 +1,3 @@
-/*
-
-	Copyright 2025 - Herber eDevelopment - Jaroslav Herber
-	All rights reserved.
-
-	This code is proprietary and confidential.
-	Copying, modification, distribution, or use of this code without explicit permission is strictly prohibited.
-
-*/
-
 var oLongPressTimeout = false,
   bButtonIsPressed = false,
   fShortEventFunction = false,
@@ -158,7 +148,6 @@ function smartControlAction(k) {
   switch (k) {
     case aButtons["KeyUp"]:
       if (bProgramBrowserOpened) {
-        //document.body.classList.toggle('full-epg-desc');
         var oDesc = oEpgChannelBrowser.querySelector(
           "#p_pos_" + iCurrentProgramPos + " .p-content"
         );
@@ -191,9 +180,6 @@ function smartControlAction(k) {
       if (sSmartControlActive === "epg" || sSmartControlActive === "player") {
         return showSmartControls("playback");
       } else if (sSmartControlActive === "playback") {
-        //toggleSubtitles();
-        //getEl('smart-arrow-down').innerText = getLang('smart-togglesubtitles') + ' (' + (bSubtitlesActive ? 'on' : 'off') + ')';
-        //focusControls();
       }
 
       if (bProgramBrowserOpened) {
@@ -236,7 +222,6 @@ function smartControlAction(k) {
 
     case 13: // OK button
       if (bProgramBrowserOpened) {
-        // If program has archive, play
         var oEpgProg = getEl("p_pos_" + iCurrentProgramPos);
         if (oEpgProg && oEpgProg.classList.contains("p-arch")) {
           var aData = JSON.parse(JSON.stringify(oEpgProg.dataset));
@@ -310,7 +295,6 @@ function showSmartControls(sType, bSilent) {
       oRight.innerText = getLang("smart-channelsettings");
       oOk.innerText = getLang("smart-guide");
 
-      // Load EPG
       setSmartEpg();
       body.classList.add("show-top-epg");
 
@@ -326,7 +310,7 @@ function showSmartControls(sType, bSilent) {
       if (sDeviceFamily === "Android") {
         hideSmartControls();
         showControls();
-        return true; // Only allow ExoPlayer controls
+        return true;
       }
 
       showControls();
@@ -334,11 +318,10 @@ function showSmartControls(sType, bSilent) {
       var iSkipSteps = AppSettings.getNumberSetting("skip-step-size", 10);
 
       oUp.innerText = bEpgEnabled ? getLang("smart-channelepg") : "";
-      //oDown.innerText = getLang('smart-togglesubtitles') + ' (' + (bSubtitlesActive ? 'on' : 'off') + ')';
       oDown.innerText = "";
       oLeft.innerText = "+" + iSkipSteps + "s";
       oRight.innerText = "-" + iSkipSteps + "s";
-      oOk.innerText = ""; //getLang('smart-playpause');
+      oOk.innerText = "";
 
       break;
   }
@@ -402,7 +385,6 @@ function changeVolume(sDir, bVolumneOnly) {
 
     setVolume(currentVolume);
 
-    // If the volume has been turned off, also set it as muted
     if (currentVolume <= 0) {
       oAvPlayer.muted = true;
       oAvPlayer.volume = 0;
@@ -413,7 +395,6 @@ function changeVolume(sDir, bVolumneOnly) {
     }
   }
 
-  // change volume with mousewheel
   if (bVolumeChange) {
     var oPlaybackController = document.getElementById("playback_controller");
     oPlaybackController.classList.add("show-volume");
@@ -589,7 +570,6 @@ function updateProgressBar(iCurTime) {
     bAddHours = iDur > 3599;
 
   if (iCurTime && !aArchiveData) {
-    // Take time from players timeupdate
   } else {
     iCurTime = getCurrentControlsTime();
   }
@@ -610,8 +590,6 @@ function removeDeviceControls() {
 }
 
 function initPlaybackControls() {
-  //removeDeviceControls();
-
   oVolume = document.getElementById("volume");
   oVolumeBar = document.getElementById("volume_bar");
 
@@ -622,7 +600,6 @@ function initPlaybackControls() {
 
   var oPlayPause = document.getElementById("playpause");
 
-  // Add event listeners for video specific events
   oAvPlayer.addEventListener(
     "play",
     function () {
@@ -657,7 +634,6 @@ function initPlaybackControls() {
   oVolumeBar.addEventListener("input", function (e) {
     var currentVolume = this.value;
     oAvPlayer.volume = currentVolume;
-    // Note: can only do this with the custom control set as when the 'volumechange' event is raised, there is no way to know if it was via a volume or a mute change
     if (currentVolume <= 0) {
       oAvPlayer.muted = true;
     } else {
@@ -673,7 +649,6 @@ function initPlaybackControls() {
     oProgressBar.setAttribute("max", getControlsDuration());
   });
 
-  // As the video is playing, update the progress bar
   oAvPlayer.addEventListener("timeupdate", function () {
     updateProgressBar();
   });
@@ -694,7 +669,6 @@ function initPlaybackControls() {
 
 function swipeLeft2Right() {
   if (bNavOpened) {
-    // RIGHT
     if (bAdvancedNavOpened) {
       showGroups();
     } else if (bGroupsOpened) {
@@ -708,7 +682,6 @@ function swipeLeft2Right() {
 }
 
 function swipeRight2Left() {
-  // LEFT
   if (bAdvancedNavOpened) {
   } else if (bChannelSettingsOpened) {
     hideChannelSettings();
@@ -760,7 +733,6 @@ function initTouchControls() {
       bPlaylistSelectorOpened ||
       bSeriesSelectorOpened
     ) {
-      //e.preventDefault();
       bMoving = false;
       return false;
     }
@@ -775,7 +747,6 @@ function initTouchControls() {
       return false;
     }
 
-    //touchPlayerEnd(e);
     if (e.touches.length) {
       newX = e.touches[0].screenX;
       newY = e.touches[0].screenY;
@@ -784,7 +755,6 @@ function initTouchControls() {
     var x = cX - newX,
       y = cY - newY;
 
-    // activate if X movement is twice as far as Y movement
     if (Math.abs(x) > Math.abs(y) * 2) {
       if (x > 100) {
         if (bProgramBrowserOpened) {
@@ -880,7 +850,6 @@ function initTouchControls() {
       oSelectedItem = el.target.parentElement;
       selectListItem();
     } else if (is(el.target, "img")) {
-      // logo
       oSelectedItem = el.target.parentElement.parentElement;
       selectListItem();
     }
@@ -943,14 +912,6 @@ function hideControlsArrow() {
 }
 
 function initMouseControls() {
-  // Hover on settings nav items
-  /*
-	oSettingsTabs.forEach(function(el) {
-		el.onmouseover = function() {
-			el.click();
-		}
-	});*/
-
   oGroupsNav.onwheel = function (oEl) {
     this.scrollTop += (oEl.wheelDelta < 0 ? 1 : -1) * 162;
     oEl.preventDefault();
@@ -995,18 +956,6 @@ function initMouseControls() {
       }
     }
   };
-
-  // Leave window
-  /*document.addEventListener("mouseout", function(e) {
-		e = e ? e : window.event;
-		var oEl = e.relatedTarget || e.toElement;
-		if( !oEl || oEl.nodeName == "HTML" ) {
-			if( bProgramBrowserOpened ) {
-				hideChannelProgramBrowser();
-			}
-		}
-	});
-	*/
 
   var oPlayer = document.getElementById("player"),
     iHideArrowTimeout = 0;
@@ -1072,14 +1021,6 @@ function initMouseControls() {
       clearTimeout(iHideArrowTimeout);
       showControlsArrow();
 
-      // Mouse cursor on left edge - open nav
-      /*
-		if( ev.pageX < 5 ) {
-			bMouseOpenedNav = true;
-			showNav();
-			return false;
-		} else */
-
       if (bMouseOpenedNav) {
         hideNav();
         return false;
@@ -1089,21 +1030,6 @@ function initMouseControls() {
         return false;
       }
 
-      // Mouse cursor on right edge - open epg
-      //if( (oAvPlayer.offsetWidth - ev.pageX) < 10 ) {
-      /*if( ev.pageY < 30 ) {
-			bMouseOpenedEpg = true;
-			hideChannelName();
-			showChannelProgramBrowser();
-			return false;
-		} else if( bMouseOpenedEpg ) {
-			bMouseOpenedEpg = false;
-			hideChannelProgramBrowser();
-			return false;
-		}*/
-
-      //var iPercentY = ev.pageY / oAvPlayer.offsetHeight;
-      //if( iPercentY > 0.8 ) {
       if (oAvPlayer.offsetHeight - ev.pageY < 100) {
         showControls();
         hideControlsArrow();
@@ -1159,20 +1085,6 @@ function initMouseControls() {
     initPlaybackControls();
   }
 
-  // Use custom fullscreen
-  /*
-	document.addEventListener('webkitfullscreenchange', function(ev) {
-		ev.preventDefault();
-		//toggleFullScreen();
-		console.log( ev );
-		return false;
-	});
-
-	oPlayer.addEventListener('click', function(ev) {
-		console.log( ev );
-	}, false);
-	*/
-
   if (sDeviceFamily === "Browser") {
     document.addEventListener(
       "contextmenu",
@@ -1194,7 +1106,6 @@ function initVirtualKeyboard() {
       if (event.detail.visibility) {
         console.log("Virtual keyboard appeared");
         bKeyboardVisible = true;
-        // Do something.
       } else {
         console.log("Virtual keyboard disappeared");
         bKeyboardVisible = false;
@@ -1205,8 +1116,6 @@ function initVirtualKeyboard() {
         ) {
           document.activeElement.blur();
         }
-
-        // Do something.
       }
     },
     false
@@ -1247,7 +1156,6 @@ var aButtons = {
   MediaPause: 2,
   MediaRewind: 9999,
   MediaFastForward: 9999,
-  //'MediaPlayPause': 9999,
   MediaTrackPrevious: 9999,
   MediaTrackNext: 9999,
 
@@ -1303,12 +1211,11 @@ if (sDeviceFamily === "LG") {
   aButtons["Guide"] = 406; // Blue button
   aButtons["ChannelUp"] = 38;
   aButtons["ChannelDown"] = 40;
-  //aButtons['PreviousChannel'] = 40;
 }
 
 if (sDeviceFamily === "Browser") {
-  aButtons["ChannelUp"] = 38; // Pfeil nach oben
-  aButtons["ChannelDown"] = 40; // Pfeil nach unten
+  aButtons["ChannelUp"] = 38;
+  aButtons["ChannelDown"] = 40;
 }
 
 if (sDeviceFamily === "Samsung" && tizen) {
@@ -1369,7 +1276,6 @@ function initControls() {
     }
   };
 
-  // Key 113 -> F2 ist mapped as backbutton in android app
   oSearchField.onkeydown = function (e) {
     var k = e.keyCode;
     if (this.value == "" && (k == 37 || k == 39)) {
@@ -1414,7 +1320,6 @@ function initControls() {
     }
   });
 
-  // add eventListener for keydown
   document.addEventListener("keydown", function (e) {
     if (!bBootComplete) {
       e.preventDefault();
@@ -1425,17 +1330,13 @@ function initControls() {
       return false;
     }
 
-    // Handled in keydown event
     if (bButtonIsPressed) {
       e.preventDefault();
       return false;
     }
 
-    //bFirstPlayStatus = 1;
-
     var k = e.keyCode;
 
-    // Disable default behaviour of arrow buttons
     if (k == 38 || k == 40) {
       e.preventDefault();
     }
@@ -1477,7 +1378,6 @@ function initControls() {
         case 10009: // RETURN
         case 27: // ESC
         case 113: // F2 - backbutton in android
-          //moveChannelPos(0);
           if (bIsInputField) {
             oMoveChannelInput.blur();
           }
@@ -1604,10 +1504,8 @@ function initControls() {
       return;
     }
 
-    // Some global keys
     switch (k) {
       case aButtons["E-Manual"]:
-        //showGuide();
         showControlsGuide(sDeviceFamily);
         break;
       case aButtons["Info"]:
@@ -1635,7 +1533,6 @@ function initControls() {
         break;
     }
 
-    // Playlist selector (nav)
     if (bPlaylistSelectorOpened) {
       e.preventDefault();
 
@@ -1666,7 +1563,6 @@ function initControls() {
       return false;
     }
 
-    // Series selector (nav)
     if (bSeriesSelectorOpened) {
       e.preventDefault();
 
@@ -1680,7 +1576,6 @@ function initControls() {
           oSelectedItem = moveListDown();
           break;
         case 37: // LEFT
-          //hideSeriesSelector();
           break;
         case 13: // OK button
           selectListItem();
@@ -1742,12 +1637,10 @@ function initControls() {
       }
     }
 
-    // Channel settings opened
     if (bChannelSettingsOpened) {
       if (sChannelSetting) {
         var oSettingSelectBoxes = false;
 
-        // Sub / Dub settings opened
         if (sChannelSetting === "sub-dub") {
           oSettingSelectBoxes = document.querySelectorAll(
             "#channel_settings_subs .setting-button"
@@ -1852,11 +1745,9 @@ function initControls() {
       return false;
     }
 
-    // Nav opened
     if (bNavOpened) {
       e.preventDefault();
 
-      // Edit mode
       if (bChannelEditModeActive) {
         console.log("bChannelEditModeActive");
 
@@ -1922,22 +1813,10 @@ function initControls() {
 
         case 33: // PAGE UP
         case 38: // UP
-          /*longPressEvent(function() {
-						oSelectedItem = moveListUp(10);
-					}, function() {
-						oSelectedItem = moveListUp();
-					}, 450, true);*/
-
           oSelectedItem = moveListUp();
           break;
         case 34: // PAGE DOWN
         case 40: // DOWN
-          /*longPressEvent(function() {
-						oSelectedItem = moveListDown(10);
-					}, function() {
-						oSelectedItem = moveListDown();
-					}, 450, true);*/
-
           oSelectedItem = moveListDown();
           break;
 
@@ -1959,32 +1838,20 @@ function initControls() {
           break;
 
         case aButtons["ChannelUp"]:
-          // scroll faster
           if (!bGroupsOpened) {
             oSelectedItem = moveListUp(10);
           }
           break;
 
         case aButtons["ChannelDown"]:
-          // scroll faster
           if (!bGroupsOpened) {
             oSelectedItem = moveListDown(10);
           }
           break;
 
         case aButtons["PreviousChannel"]:
-          // search previous channel in list
-
           break;
         case 13: // OK button
-          /*
-					if( bSearchFocused ) {
-						oSearchField.blur();
-						bSearchFocused = false;
-						return false;
-					}
-					*/
-
           if (bGroupsOpened || bAdvancedNavOpened) {
             selectListItem();
             return false;
@@ -2010,20 +1877,12 @@ function initControls() {
         case 10009: // RETURN
         case 27: // ESC
         case 113: // F2 - backbutton in android
-          /*
-					if( bSearchFocused ) {
-						oSearchField.blur();
-						bSearchFocused = false;
-						return false;
-					}
-					*/
           hideNav();
       }
 
       return false;
     }
 
-    // no other layer opened. Channel playing
     switch (k) {
       case aButtons["Search"]:
       case aButtons["ColorF0Red"]:
@@ -2101,7 +1960,6 @@ function initControls() {
         jumpForwards();
         break;
 
-      //case aButtons['MediaPlayPause']:
       case aButtons["MediaPlay"]:
         if (
           sDeviceFamily === "Samsung" &&
@@ -2111,10 +1969,8 @@ function initControls() {
           return false;
         }
 
-        //playVideo();
         togglePlayState();
         return false;
-        //oHlsApi.startLoad();
         break;
 
       case aButtons["MediaStop"]:
@@ -2151,7 +2007,6 @@ function initControls() {
         break;
 
       case aButtons["PictureSize"]:
-        //switchVideoFormat('next');
         break;
 
       case aButtons["MediaTrackPrevious"]:
@@ -2174,7 +2029,6 @@ function initControls() {
           iChannelInputNumber = parseInt(iChannelInputNumber) - 1;
           loadChannel(iChannelInputNumber);
           iChannelInputNumber = "";
-          //getEl('channel_input').style.display = 'none';
           hideChannelInput();
           return false;
         }
@@ -2186,12 +2040,10 @@ function initControls() {
 
         if (bChannelNameOpened && bChannelHasEpg) {
           showTopEpg("browser");
-          //showEpgOverview();
           return false;
         }
 
         showChannelName(true);
-        //longPressEvent(showEpgOverview, showChannelName);
 
         break;
 
@@ -2210,8 +2062,6 @@ function initControls() {
         break;
 
       default:
-        //showModal('Key code : ' + k);
-        //console.log('no action for key:' + k);
         return true;
         break;
     }
