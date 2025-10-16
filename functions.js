@@ -1,13 +1,3 @@
-/*
-
-	Copyright 2025 - Herber eDevelopment - Jaroslav Herber
-	All rights reserved.
-
-	This code is proprietary and confidential.
-	Copying, modification, distribution, or use of this code without explicit permission is strictly prohibited.
-
-*/
-
 function getEl(sId) {
   return document.getElementById(sId);
 }
@@ -175,17 +165,7 @@ function insertCharAt(sString, sChar, iPos) {
 
 function debug(mVar) {
   if (bDebuggerEnabled) {
-    /*if( sDeviceFamily !== 'Browser' ) {
-			var oDate = new Date(), iMinutes = oDate.getMinutes(), iSeconds = oDate.getSeconds();
-			if( iSeconds < 10 ) { iSeconds = '0' + iSeconds; }
-			if( iMinutes < 10 ) { iMinutes = '0' + iMinutes; }
-			var sDate = oDate.getHours() + ":" + iMinutes + ":" + iSeconds;
-			oDebugger.innerHTML = sDate + ': ' + mVar + '<hr>' + oDebugger.innerHTML;
-			oDebugger.scrollTop = 0;
-		}*/
     console.log(mVar);
-    //console.trace(mVar);
-    //console.log(new Error().stack);
     if (typeof debugCallback === "function") {
       debugCallback(sDate + ": " + mVar);
     }
@@ -195,8 +175,6 @@ function debug(mVar) {
 function debugError(e) {
   if (bDebuggerEnabled) {
     console.error(e.message);
-    //console.trace(e);
-    //console.log(e.trace);
   }
 }
 
@@ -205,11 +183,12 @@ function debugCritical(mVar) {
     debugRemote(mVar);
     return;
   }
-
+  /*
   doAppServerRequest(
     "https://m3u-ip.tv/premium/debug.php?msg=" + mVar,
     function (oHttp) {}
   );
+  */
 }
 
 function defocus() {
@@ -217,8 +196,6 @@ function defocus() {
   if (oActiveElement) {
     oActiveElement.blur();
   }
-
-  //getEl('defocus').focus();
 }
 
 function getAppId() {
@@ -245,7 +222,6 @@ function getHostname(sUrl) {
 }
 
 function openExternalLink(oEl) {
-  //navigator.app.loadUrl(oEl.href, {openExternal: true});
   window.open(oEl.href, "_system");
   return false;
 }
@@ -383,14 +359,6 @@ function setBootStatusText(sText) {
   getEl("boot_status").innerHTML = sText + " …";
 }
 
-/*
-// Database
-	bDbInitiated:
-		0 - no init yet
-		1 - loading or creating success
-		5 - error and recreate
-		9 - is loading the first time right now
-*/
 function initDb(sOnSuccess, sOnFailure) {
   if (bDbInitiated > 0) {
     return bDbInitiated;
@@ -413,11 +381,6 @@ function initDb(sOnSuccess, sOnFailure) {
       var aStoreNames = oDb.objectStoreNames,
         iTablesCount = aStoreNames.length;
 
-      /*for( var i = 0; i < iTablesCount; i++ ) {
-				oDb.deleteObjectStore(aStoreNames[i]);
-			}*/
-
-      // recreate DB
       createObjectStores(oDb, aStoreNames);
     };
 
@@ -427,19 +390,15 @@ function initDb(sOnSuccess, sOnFailure) {
       sOnSuccess();
 
       if (oDb.objectStoreNames.length < 2) {
-        //createObjectStores(oDb); // cannot create in onsuccess
         debug("DB recreation neeeded");
       }
     };
     oDbOpen.onerror = function (oEv) {
       debug("Error loading db");
 
-      // try recreate DB
       if (bDbInitiated !== -1 && oEv.target.error.name === "VersionError") {
         bDbInitiated = -1; // prevent loop
-        //debug("Delete and recreate DB");
         indexedDB.deleteDatabase("m3u_v3").onsuccess = function () {
-          //debug("Delete successful. Recreate now.");
           initDb(sOnSuccess, sOnFailure);
         };
       } else {
@@ -548,7 +507,6 @@ function hexToBase64(hex) {
 
   var binary = String.fromCharCode.apply(null, bytes);
 
-  // Encode binary string to Base64
   return btoa(binary)
     .replace(/\+/g, "-")
     .replace(/\//g, "_")
@@ -656,7 +614,6 @@ function customConfirmExit(sText) {
           typeof sTvManufacturer === "string" &&
           sTvManufacturer === "Vidaa"
         ) {
-          // Show confirm box (see below)
         } else {
           break;
         }
@@ -679,25 +636,6 @@ function customConfirmExit(sText) {
 
         if (typeof sAdditionalExitHtml === "string") {
           sButtons += sAdditionalExitHtml;
-        }
-
-        if (
-          typeof isPremiumAccessAllowed === "function" &&
-          !isPremiumAccessAllowed()
-        ) {
-          if (sDeviceFamily === "Android" && !bIsAndroidTv) {
-            sButtons +=
-              '<div class="HR" style="margin: 40px 0;"></div><p style="padding: 10px">' +
-              getLang("donate") +
-              "</p>";
-          } else {
-            sButtons +=
-              '<div class="HR" style="margin: 40px 0;"></div><p id="custom_confirm_donation" class="FLOATLEFT" style="max-width: 260px; padding: 10px">' +
-              getLang("donate") +
-              "</p>";
-            sButtons +=
-              '<div style="display: inline-block; background: #fff; padding: 20px;"><img style="display: block;" src="https://m3u-ip.tv/images/donate.png" width="180" height="180" alt="donation"></div>';
-          }
         }
 
         oConfirmbox.innerHTML =
@@ -781,7 +719,6 @@ function doAppServerRequest(sUrl, sCallback) {
   oHttp.timeout = 3000;
   oHttp.onreadystatechange = function () {
     if (oHttp.readyState == XMLHttpRequest.DONE) {
-      // oHttpRequest.DONE == 4
       if (
         oHttp.status === 200 &&
         oHttp.getResponseHeader("custom-validation-server") ===
@@ -852,24 +789,10 @@ function doAppServerRequest(sUrl, sCallback) {
 }
 
 function addRemoteBootScript(sCallback) {
-  if (sDeviceFamily === "LG" && typeof webOSDev === "object") {
-    webOSDev.LGUDID({
-      onSuccess: function (res) {
-        sLgDeviceId = res.id;
-        doAppServerRequest("https://m3u-ip.tv/premium/settings.php", sCallback);
-      },
-      onFailure: function (res) {
-        doAppServerRequest("https://m3u-ip.tv/premium/settings.php", sCallback);
-      },
-    });
-
-    return;
+  // Bypassed remote call to keep app free and offline-capable.
+  if (typeof sCallback === "function") {
+    sCallback();
   }
-
-  return doAppServerRequest(
-    "https://m3u-ip.tv/premium/settings.php",
-    sCallback
-  );
 }
 
 // Android
@@ -889,7 +812,6 @@ function applyTouchMode() {
 
     document.body.classList.add("touchmode");
 
-    // Add helper touch icons for guide function
     if (sView === "settings") {
       var oGuideItems = document.querySelectorAll(
         ".settings-nav li[data-guide]"
