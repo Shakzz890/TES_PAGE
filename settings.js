@@ -1,13 +1,3 @@
-/*
-
-	Copyright 2025 - Herber eDevelopment - Jaroslav Herber
-	All rights reserved.
-
-	This code is proprietary and confidential.
-	Copying, modification, distribution, or use of this code without explicit permission is strictly prohibited.
-
-*/
-
 var AppSettings = {
   storageKey: "settings",
   settings: {},
@@ -97,13 +87,6 @@ function applyBufferSetting() {
     case "Browser":
     case "LG":
       if (oHlsApi) {
-        //oHlsApi.config.maxMaxBufferLength = '30s';
-        //oHlsApi.config.liveSyncDuration = 7;
-        //oHlsApi.config.debug = true;
-        //oHlsApi.config.testBandwidth = false;
-        //oHlsApi.config.liveSyncDuration = 6;
-        //debug('apply test config');
-
         oHlsApi.config.maxBufferLength = iBufferLength;
         oHlsApi.config.maxBufferSize = iBufferLength * 2000000;
       }
@@ -113,28 +96,20 @@ function applyBufferSetting() {
       if (sState === "PLAYING") {
         webapis.avplay.stop();
         sState = webapis.avplay.getState();
-        //debug('applyBufferSetting stop stream. Status: ' + sState);
       }
 
       if (sState === "IDLE") {
-        // https://msx.benzac.de/wiki/index.php?title=Tizen_Player#Syntax
-        // this crashes some channels :(
-        //webapis.avplay.setStreamingProperty("PREBUFFER_MODE", (iBufferLength * 1000).toString());
         webapis.avplay.setTimeoutForBuffering(iBufferLength);
-
-        // For the initial buffering
         webapis.avplay.setBufferingParam(
           "PLAYER_BUFFER_FOR_PLAY",
           "PLAYER_BUFFER_SIZE_IN_SECOND",
           iBufferLength
-        ); // in seconds
-        // For the rebuffering
+        );
         webapis.avplay.setBufferingParam(
           "PLAYER_BUFFER_FOR_RESUME",
           "PLAYER_BUFFER_SIZE_IN_SECOND",
           iBufferLength + 15
-        ); // in seconds
-        //debug('applyBufferSetting OK');
+        );
       }
 
       break;
@@ -216,9 +191,7 @@ function isTrialActive() {
 }
 
 function isPremiumAccessAllowed() {
-  return (
-    getLicenseType() === "Premium" || isTrialActive() || isAdsPremiumActive()
-  );
+  return true;
 }
 
 var bAdsPremiumActive = false;
