@@ -1,13 +1,3 @@
-/*
-
-	Copyright 2025 - Herber eDevelopment - Jaroslav Herber
-	All rights reserved.
-
-	This code is proprietary and confidential.
-	Copying, modification, distribution, or use of this code without explicit permission is strictly prohibited.
-
-*/
-
 var oPlaylistNavSelector = getEl("playlist_selector_list"),
   iFirstPlaylistId = false,
   bDownloadRunning = false,
@@ -23,13 +13,7 @@ function bootPlaylistReady(sOnSuccess, sOnFailure) {
       iCurrentPlaylistId = 0;
     }
 
-    // Is allowed to load playlist?
-    if (!isPremiumAccessAllowed()) {
-      iCurrentPlaylistId = iFirstPlaylistId;
-    }
-
     setActivePlaylist(iCurrentPlaylistId, sOnSuccess, sOnFailure);
-    //getPlaylistChannels(iCurrentPlaylistId, sOnSuccess, sOnFailure);
   }, sOnFailure);
 }
 
@@ -63,7 +47,6 @@ function reloadPlaylist(sCallback) {
     setBootStatusText("Downloading playlist");
 
     localStorage.removeItem("deviceStartup");
-    //debug('startup reloading playlist');
 
     abortPlaylistDownload();
     bDownloadRunning = true;
@@ -160,7 +143,6 @@ function setActivePlaylist(sId, sOnSuccess, sOnFailure) {
       getPlaylistChannels(
         sId,
         function (iPlaylistId) {
-          //aActiveChannelList = aChannelList; //sortChannelList(aChannelList);
           sOnSuccess(iPlaylistId);
         },
         sOnFailure
@@ -182,7 +164,6 @@ function loadPlaylists(sOnSuccess, sOnFailure) {
     setBootStatusText("Loading playlist");
 
     aLoadedPlaylists = [];
-    //oPlaylistList.className = 'loading';
 
     var oTx = oDb.transaction("playlistStore"),
       oStore = oTx.objectStore("playlistStore"),
@@ -230,18 +211,14 @@ function loadPlaylists(sOnSuccess, sOnFailure) {
         sHtml += "</p>";
         oPlaylistItem.innerHTML = sHtml;
 
-        //sHtmlList += '<div class="playlist-item" id="playlist_item_' + aPlaylist.id + '"><button class="button icon-button edit" onclick="editPlaylist(' + aPlaylist.id + ')"></button>' + aPlaylist.name + ' <span></span></div>';
-        //oPlaylistList.appendChild(oPlaylistItem);
         iListCount++;
 
-        // print channel count
         var oChannelsCount = document.createElement("span");
         oChannelsCount.innerHTML = "...";
         oPlaylistItem.appendChild(oChannelsCount);
 
         if (iPlaylistChannelCount) {
           oChannelsCount.innerHTML = "(" + iPlaylistChannelCount + ")";
-          //oPlaylistItem.classList.remove('no-channels');
         } else {
           oChannelsCount.innerHTML = "no channels!";
           oPlaylistItem.classList.add("no-channels");
@@ -255,7 +232,6 @@ function loadPlaylists(sOnSuccess, sOnFailure) {
 
     oRequest.onerror = function (e) {
       bIsLoadingPlaylists = false;
-      //oPlaylistList.className = '';
 
       if (typeof sOnFailure === "function") {
         sOnFailure(e);
@@ -265,13 +241,10 @@ function loadPlaylists(sOnSuccess, sOnFailure) {
     oTx.oncomplete = function () {
       bNeedNavRefresh = true;
       bIsLoadingPlaylists = false;
-      //oPlaylistList.className = '';
 
       if (!iListCount) {
-        //oPlaylistList.innerHTML = '<p class="i18n icon hint icon-guide" data-langid="noPlaylistYet">' + getLang('noPlaylistYet') + '</p>';
       } else {
         bPlaylistFileLoaded = true;
-        //console.log("playlist header load complete. Playlist count: " + iListCount);
       }
 
       if (typeof sOnSuccess === "function") {
@@ -339,7 +312,6 @@ function sortForcedPositions() {
   }
 }
 
-// Experimental
 function sortChannelList() {
   var result = [],
     insertPos = 0,
@@ -374,7 +346,6 @@ function sortChannelList() {
     if (aForcedPositions[i]) {
       result[insertPos] = aForcedPositions[i];
       insertPos++;
-      //delete aForcedPositions[i];
     }
     var oCh = aList[i];
     if (typeof oCh.fpos !== "undefined") {
@@ -385,8 +356,6 @@ function sortChannelList() {
   }
 
   for (i in aForcedPositions) {
-    //result[insertPos] = aForcedPositions[i];
-    //insertPos++;
   }
 
   console.log(aList);
@@ -411,22 +380,7 @@ function getPlaylistChannels(iPlaylistId, sOnSuccess, sOnFailure) {
 
   oRequest.onsuccess = function (e) {
     aActiveChannelList = e.target.result.filter((r) => !r.deleted);
-    //aForcedPosChannels = records.filter(r => r.fposDate);
   };
-
-  /*oRequest.onsuccess = function(e) {
-		bIsLoadingPlaylists = true;
-		var oRecord = e.target.result;
-		if( oRecord && oRecord.value && !oRecord.value.deleted ) {
-			aChannelList.push(oRecord.value);
-			if( oRecord.value.fposDate ) {
-				aForcedPosChannels.push(oRecord.value);
-			}
-		}
-		if( oRecord ) {
-			oRecord.continue();
-		}
-	};*/
 
   oRequest.onerror = function (e) {
     bIsLoadingPlaylists = false;
@@ -437,7 +391,6 @@ function getPlaylistChannels(iPlaylistId, sOnSuccess, sOnFailure) {
 
   oTx.oncomplete = function () {
     bIsLoadingPlaylists = false;
-    //sortForcedPositions();
 
     if (typeof sOnSuccess === "function") {
       sOnSuccess(iPlaylistId);
@@ -470,7 +423,6 @@ function saveChannel(oChannel, sCallback) {
     oStore = tx.objectStore("playlistChannels");
   oStore.put(oChannel);
   tx.oncomplete = function () {
-    //debug('channel updated in DB');
     if (typeof sCallback === "function") {
       sCallback();
     }
@@ -496,7 +448,6 @@ function getPlaylist() {
   return localStorage.getItem("sM3uList");
 }
 
-// Fired after Playlist was loaded
 function playlistReadyHandler() {
   hideModal();
 
@@ -532,12 +483,6 @@ function hidePlaylistSelector() {
 }
 
 function pickPlaylistSelector(oNavItem, bSkipPremiumCheck) {
-  // Is allowed to load playlist?
-  if (!bSkipPremiumCheck && !isPremiumAccessAllowed()) {
-    showModal(getLang("license-fail"));
-    return false;
-  }
-
   var iPlaylistId = parseInt(oNavItem.dataset.pid);
 
   if (oCurrentPlaylist.id === iPlaylistId) {
@@ -545,7 +490,6 @@ function pickPlaylistSelector(oNavItem, bSkipPremiumCheck) {
     return false;
   }
 
-  // EPG download running? Close it
   abortEpgDownload();
 
   var oPlaylistSelector = getEl("playlist_selector"),
@@ -562,7 +506,6 @@ function pickPlaylistSelector(oNavItem, bSkipPremiumCheck) {
 
   oNavItem.classList.add("selected");
 
-  // Save last played channel to DB
   if (oCurrentPlaylist) {
     oCurrentPlaylist.lastChannel = iCurrentChannel;
     saveCurrentPlaylist(oCurrentPlaylist);
@@ -595,20 +538,15 @@ function pickPlaylistSelector(oNavItem, bSkipPremiumCheck) {
 
       loadChannel(iLoadChannel);
 
-      // start EPG grab
       startEgpGrabbing();
-
-      //showGroups();
     },
     function () {
-      // error
       document.body.classList.remove("booting");
       showModal("Cannot load playlist. Please reload app.");
     }
   );
 }
 
-//// Xtream
 var aSeriesEpisodes = false,
   bSeriesPlaying = false;
 
@@ -653,7 +591,6 @@ function hideSeriesSelector() {
   oSelectedItem = getCurrentSelectedItem();
 }
 
-// TODO
 function showEpisodeDescription(i) {
   if (aSeriesEpisodes[i]) {
     var sHtml = aSeriesEpisodes[i].title;
@@ -670,10 +607,6 @@ function pickSeriesSelector(oNavItem) {
   var iSid = oNavItem.dataset.sid,
     iEid = oNavItem.dataset.eid;
   if (aSeriesEpisodes && aSeriesEpisodes[iSid] && aSeriesEpisodes[iSid][iEid]) {
-    if (!isPremiumAccessAllowed()) {
-      showModal(getLang("license-fail"));
-      return false;
-    }
 
     var oEp = aSeriesEpisodes[iSid][iEid];
     var sServerUrl = oCurrentPlaylist.server,
