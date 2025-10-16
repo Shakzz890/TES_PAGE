@@ -1,13 +1,3 @@
-/*
-
-	Copyright 2025 - Herber eDevelopment - Jaroslav Herber
-	All rights reserved.
-
-	This code is proprietary and confidential.
-	Copying, modification, distribution, or use of this code without explicit permission is strictly prohibited.
-
-*/
-
 // Controls
 var bKeyboardVisible = false,
   bControlsOpened = false,
@@ -175,12 +165,6 @@ function hideLoader() {
 
 function showGuide() {
   showControlsGuide(sDeviceFamily);
-
-  /*
-	bGuideOpened = true;
-	document.body.classList.add('showguide');
-	getEl('guide_content').scrollIntoView();
-*/
 }
 
 function hideGuide() {
@@ -220,14 +204,12 @@ function checkNetwork() {
       // Check network status
       webapis.network.addNetworkStateChangeListener(function (value) {
         if (value == webapis.network.NetworkState.GATEWAY_DISCONNECTED) {
-          // Something you want to do when network is disconnected
           showModal(getLang("connectionLost"));
           debug("GATEWAY_DISCONNECTED");
           if (bPlayerLoaded && iCurrentChannel) {
             webapis.avplay.pause();
           }
         } else if (value == webapis.network.NetworkState.GATEWAY_CONNECTED) {
-          // Something you want to do when network is connected again
           hideModal();
           debug("GATEWAY_CONNECTED");
           if (bPlayerLoaded && iCurrentChannel) {
@@ -239,8 +221,6 @@ function checkNetwork() {
       debugError(e);
     }
   }
-
-  // LG: TODO: https://itnext.io/how-to-check-network-connection-on-smarttv-webos-and-tizen-75256c67584b
 }
 
 function fireRequest(sUrl, sOnSuccess, sOnFailure) {
@@ -363,7 +343,6 @@ function applyUserAgent() {
       if (sState === "PLAYING") {
         stopVideo();
         sState = webapis.avplay.getState();
-        //debug('applyUserAgent stop stream. Status: ' + sState);
       }
 
       if (sState === "IDLE") {
@@ -373,10 +352,6 @@ function applyUserAgent() {
         } else {
           webapis.avplay.setStreamingProperty("USER_AGENT", sUserAgent);
         }
-
-        //debug('setStreamingProperty USER_AGENT: ' + sUserAgent);
-        // This crashes app on startup
-        //tizen.websetting.setUserAgentString(sUserAgent);
       }
 
       break;
@@ -442,17 +417,12 @@ function boot() {
 
   initDb(
     function () {
-      // DB successfully loaded, load playlists next
-
       showLoader();
 
       applyPlayerSettings();
 
-      var bIsPremiumLicense = getLicenseType() === "Premium";
+      var bIsPremiumLicense = true;
       checkAdsPremium();
-      /*if( !bIsPremiumLicense && bAdsPremiumActive ) {
-			prepareAd();
-		}*/
 
       iCurrentPlaylistId = localStorage.getItem("iCurrentPlaylistId");
       if (!iCurrentPlaylistId) {
@@ -462,13 +432,12 @@ function boot() {
 
       bootPlaylistReady(
         function (sPlaylistId, aActiveChannelList) {
-          // has playlist - play channel
           sPlaylistArchiveType = aLoadedPlaylists[sPlaylistId].archiveType;
           if (!sPlaylistArchiveType || sPlaylistArchiveType == "-") {
             sPlaylistArchiveType = false;
           }
 
-          playlistReadyHandler(); // <- initPlayer()
+          playlistReadyHandler();
 
           setTimeout(epgBoot, 1000);
           localStorage.removeItem("coming-from-settings");
@@ -476,8 +445,6 @@ function boot() {
           bBootComplete = true;
         },
         function () {
-          // no playlist yet, show settings
-          //document.body.classList.remove('booting');
           openSettings();
         }
       );
@@ -486,45 +453,6 @@ function boot() {
       // DB failure
     }
   );
-
-  /*
-	// no settings in storage yet
-	if( !bPlaylistsLoaded ) {
-
-		console.log("playlist not loaded yet");
-		if( oInputCustomUserAgent ) {
-			oInputCustomUserAgent.value = sUserAgent;
-		}
-
-		openSettings(true);
-		return false;
-	}
-
-
-	// no settings in storage yet
-	var sM3uList = getPlaylist();
-
-	// Only load valid playlist
-	oInputM3u.value = sM3uList;
-
-	loadSettings();
-
-	var oSetting = getEl('reload_playlist_setting');
-	if( oSetting && getReloadPlaylistSetting() == '1' ) {
-		oSetting.checked = true;
-		// Reload playlist
-		if( sM3uList && sM3uList.indexOf('USB://') !== 0 && sM3uList.indexOf('local://') !== 0 ) {
-			debug('reload playlist: ' + sM3uList);
-			downloadPlaylistManager(sM3uList, playlistReadyHandler, function() {
-				loadAndPlayFromCache();
-			});
-			return false;
-		}
-	}
-
-	// m3u file was already downloaded, use it
-	loadAndPlayFromCache();
-	*/
 }
 
 function setPreferredTrackLanguage() {
@@ -552,7 +480,6 @@ function getClearKeyJsonKeys(sDrmKeyString) {
         aClearkeys[sKey.kid] = sKey.k;
       });
     } else {
-      // Multi HEX
       for (var sItemKey in oParsed) {
         var sKid = hexToBase64(sItemKey),
           sKey = hexToBase64(oParsed[sItemKey]);
@@ -566,8 +493,6 @@ function getClearKeyJsonKeys(sDrmKeyString) {
       sKey = hexToBase64(aKeyParts[1]);
     aClearkeys[sKid] = sKey;
   }
-
-  //console.log(aClearkeys);
 
   return aClearkeys;
 }
@@ -584,8 +509,6 @@ function setDrmHandler() {
         if (!bDashFrameworkLoaded) {
           loadDashFramework();
         }
-        //oDashApi.setProtectionData({});
-        //oDashApi.getProtectionController().setRobustnessLevel('SW_SECURE_CRYPTO');
       }
 
       if (aCurrentChannel.drmT && aCurrentChannel.drmK) {
@@ -632,7 +555,6 @@ function setDrmHandler() {
             oHlsApi.config.drmSystems = {
               "com.apple.fps": {
                 licenseUrl: aCurrentChannel.drmK,
-                //serverCertificateUrl: serverCertificateUrl
               },
             };
             break;
@@ -676,7 +598,6 @@ function setDrmHandler() {
 
       break;
     case "Samsung":
-      // https://developer.samsung.com/smarttv/develop/api-references/samsung-product-api-references/avplay-api.html#AVPlayManager-setDrm
       if (
         webapis.avplay.getState() === "IDLE" &&
         aCurrentChannel.drmT &&
@@ -700,9 +621,6 @@ function setDrmHandler() {
             var aDrmParam = {
               DeleteLicenseAfterUse: true,
               GetChallenge: true,
-              //UserAgent: sUserAgent,
-              //CustomData: "love ya"
-              //LicenseServer: aCurrentChannel.drmK
             };
             webapis.avplay.setDrm(
               "PLAYREADY",
@@ -739,10 +657,8 @@ function resetPlayer() {
         if (sCurrentVideoEngine === "dash" && oDashApi) {
           oDashApi.attachSource(null);
         } else if (oHlsApi) {
-          //oHlsApi.destroy();
           oHlsApi.stopLoad();
           oHlsApi.detachMedia();
-          //oPlayerEngine.reset();
         }
         break;
       case "Samsung":
@@ -771,7 +687,6 @@ function stopStream() {
       }
       break;
     case "Samsung":
-      //stopVideo();
       webapis.avplay.close();
       getEl("subtitles").innerHTML = "";
       break;
@@ -813,7 +728,6 @@ function playHlsVideo(sUrl) {
   }
 
   if (oHlsApi) {
-    //oAvPlayer.src = sUrl;
     oHlsApi.attachMedia(oAvPlayer);
     oHlsApi.loadSource(sUrl);
     oHlsApi.subtitleDisplay = bSubtitlesActive;
@@ -874,12 +788,6 @@ function addFlussonicArchiveTime(sUrl, startTimestamp, durationSeconds) {
 }
 
 function loadArchiveChannel(aData, iUtcStart) {
-  // Check license
-  if (!isPremiumAccessAllowed()) {
-    showModal(getLang("license-archive-play-fail"));
-    return false;
-  }
-
   var oStartTime = getEpgDateObject(aData.start),
     iUtcBegin = Math.floor(oStartTime.getTime() / 1000);
   var oUtcNow = new Date(),
@@ -900,23 +808,20 @@ function loadArchiveChannel(aData, iUtcStart) {
   iUtcArchiveStarted = iUtcStart;
 
   switch (aData.catchup) {
-    case "shift": // ?utc=1738923365&lutc=1739038922
+    case "shift":
       sParams = "utc=" + iUtcStart + "&lutc=" + iUtcNow;
       break;
-    case "archive": // ?archive=startUnix&archive_end=toUnix
+    case "archive":
       sParams = "archive=" + iUtcStart + "&archive_end=" + iUtcEnd;
       break;
-    case "timeshift": // ?timeshift=startUnix&timenow=nowUnix
+    case "timeshift":
       sParams = "timeshift=" + iUtcStart + "&timenow=" + iUtcNow;
       break;
 
-    // HLS
     case "flussonic":
     case "flussonic-hls":
-    // MPEG-TS
     case "flussonic-ts":
     case "fs":
-    // MPEG-DASH
     case "flussonic-dash":
       var sChUrl = aActiveChannelList[iCh].url;
       if (sChUrl) {
@@ -932,7 +837,6 @@ function loadArchiveChannel(aData, iUtcStart) {
       }
       break;
     case "xc":
-      // http://host:port/streaming/timeshift.php?username=User&password=Pass&stream=1234&start=2020-12-06:08-00&duration=120
       if (oCurrentPlaylist && oCurrentPlaylist.type === "xtream" && aData.xid) {
         sParams =
           oCurrentPlaylist.server +
@@ -959,10 +863,9 @@ function loadArchiveChannel(aData, iUtcStart) {
 
         try {
           sParams = sParams.replace(/^[?&]/, "");
-          //var oAppendDate = new Date(Math.floor(iUtcStart * 1000));
           var aReplacements = {
             "{Y}": oStartTime.getFullYear(),
-            "{m}": pad(oStartTime.getMonth() + 1), // Months are 0-based
+            "{m}": pad(oStartTime.getMonth() + 1),
             "{d}": pad(oStartTime.getDate()),
             "{H}": pad(oStartTime.getHours()),
             "{M}": pad(oStartTime.getMinutes()),
@@ -974,7 +877,6 @@ function loadArchiveChannel(aData, iUtcStart) {
             "${timestamp}": iUtcNow,
             "{utcend}": iUtcEnd,
             "${end}": iUtcEnd,
-            //'{start_iso}': iUtcBegin, '{end_iso}': iUtcEnd, '{now_iso}': iUtcNow
           };
 
           if (sParams.indexOf("yyyyMMddHHmmss") !== -1) {
@@ -1132,7 +1034,6 @@ function getChannelUrl(aCh, sArchiveParams, sForceUrl) {
 
 // ---- Player
 function loadAndPlayChannelUrl() {
-  // Xtream
   if (aCurrentChannel.x_series_id) {
     return loadXtreamSeriesUrl();
   }
@@ -1150,7 +1051,6 @@ function playChannelUrl() {
     switch (sDeviceFamily) {
       case "Browser":
       case "LG":
-        //oHlsApi = new Hls(oHlsOptions);
         applyBufferSetting();
         setAdditionalHeaders();
 
@@ -1165,19 +1065,13 @@ function playChannelUrl() {
           playHlsVideo(sPlayingUrl);
         }
 
-        //loadTrackInfo();
         break;
       case "Samsung":
         webapis.avplay.open(sPlayingUrl);
         try {
-          //webapis.avplay.setSilentSubtitle(false);
           webapis.avplay.setDisplayRect(0, 0, 1920, 1080);
           applyUserAgent();
           applyBufferSetting();
-          /*
-					debug("setVideoStillMode");
-					webapis.avplay.setVideoStillMode("true");
-					*/
         } catch (e) {
           debugError(e);
         }
@@ -1203,9 +1097,7 @@ function playChannelUrl() {
   } catch (e) {
     debug("loadChannel. Something went wrong!!! " + e.message);
 
-    // Stream broke, Try restart
     if (sDeviceFamily === "Samsung") {
-      //showModal(webapis.avplay.getState(), e.message);
       tryReconnect();
     }
   }
@@ -1260,9 +1152,8 @@ function loadChannel(iNum, sArchiveParams, sForceUrl) {
   iRetryChannelLoad = 0;
   iSelectedAudioTrack = false;
   iSelectedVideoTrack = false;
-  //iSelectedSubtitleTrack = false;
   iReconnectTryAfter = 1000;
-  bChannelHasEpg = false; // Reset and set later
+  bChannelHasEpg = false;
   oChannelInfo.className = "";
 
   hideChannelError();
@@ -1332,7 +1223,6 @@ function loadChannel(iNum, sArchiveParams, sForceUrl) {
   setVideoEngine();
   lazyLoadChannel(iCurrentChannel);
 
-  // activate channel in nav
   var oNavChannel = getNavChannel(iCurrentChannel);
   var oLastSelectedNavItem = oChannelList.querySelector("li.selected");
   if (oLastSelectedNavItem) {
@@ -1346,7 +1236,7 @@ function loadChannel(iNum, sArchiveParams, sForceUrl) {
 
   if (oNavChannel) {
     oSelectedItem = oNavChannel;
-    oNavChannel.classList.add("active", "selected"); // can be filtered out!
+    oNavChannel.classList.add("active", "selected");
     scrollToListItem(oNavChannel);
   }
 
@@ -1382,17 +1272,11 @@ function loadChannel(iNum, sArchiveParams, sForceUrl) {
 }
 
 var successLoadCallback = function () {
-  //debug('The media has finished preparing');
-
   localStorage.setItem("iCurrentChannel", iCurrentChannel);
-  //localStorage.setItem('sLastChannelName', sCurrentChannelName);
   iRetryChannelLoad = 0;
   iReconnectTryAfter = 1000;
   bStreamWasInterrupted = false;
   bChannelWasAlreadyPlaying = true;
-
-  //webapis.avplay.setDisplayRect(0, 0, window.innerWidth, window.innerHeight);
-  //switchVideoFormat(false); // set fullscreen / original mode
 
   if (bChannelSettingsOpened) {
     buildSubDubForm();
@@ -1407,13 +1291,6 @@ var errorLoadCallback = function () {
   bPlayerLoaded = false;
   debug("The media has failed to prepare");
   stopVideo();
-
-  // Try again
-  /*
-	if( iRetryChannelLoad < 3 ) {
-		debug('errorLoadCallback. Retry channel load. Count: ' + iRetryChannelLoad);
-		tryReconnect();
-	}*/
 };
 
 function openUiElement(sElement) {
@@ -1428,15 +1305,12 @@ function openUiElement(sElement) {
 
   for (var i; i < aUiElements.length; i++) {
     if (aUiElements[i] == sElement) {
-      // show
     } else {
-      // hide
     }
   }
 }
 
 function clearUi(sExclude) {
-  //if( sExclude !== 'epg' ) hideChannelEpg();
   if (sExclude !== "epgOverview") hideEpgOverview();
   if (sExclude !== "nav") hideNav();
   if (sExclude !== "channelName") hideChannelName();
@@ -1459,7 +1333,6 @@ function showNav() {
   clearUi("nav");
   bNavOpened = true;
 
-  // Logos found in EPG functions, rebuild nav with new logos
   if (bNeedNavRefresh) {
     bNeedNavRefresh = false;
     buildNav();
@@ -1481,28 +1354,15 @@ function showNav() {
 
   oSearchField.removeAttribute("disabled");
 
-  // if no favs available remove the fav-group selection
   if (sSelectedGroup === "__fav" && !getFavsCount()) {
     removeGroupFilter();
     buildNav();
     return false;
   }
-
-  //oSelectedItem = getCurrentSelectedItem();
-
-  /*
-	// on channel select, show detailed EPG info
-	if( oSelectedItem && oSelectedItem.dataset.channelnum ) {
-		if( typeof(loadNavChannelEpgCallback) === 'function' ) {
-			loadNavChannelEpgCallback(oSelectedItem.dataset.channelnum);
-		}
-	}
-	*/
 }
 
 function hideNav() {
   oSearchField.setAttribute("disabled", "disabled");
-  //oNav.style.width = '0';
   hideGroups();
   hideAdvancedNav();
   bNavOpened = false;
@@ -1513,7 +1373,6 @@ function hideNav() {
     hideChannelPosInput();
   }
 
-  // Truncate nav next time it is opened if there were too many items loaded
   if (aLazyLoadedChannels.length > 200) {
     bNeedNavRefresh = true;
     buildNav();
@@ -1525,7 +1384,6 @@ function showGroups() {
   bGroupsOpened = true;
   bMouseOpenedNav = false;
   oSearchField.removeAttribute("disabled");
-  //oGroupsNav.style.width = iNavWidth + 'px';
   oSelectedItem = getCurrentSelectedItem();
   oSelectedItem.classList.add("selected");
   document.body.classList.add("groups-opened");
@@ -1533,7 +1391,6 @@ function showGroups() {
 }
 
 function hideGroups() {
-  //oGroupsNav.style.width = '0';
   bGroupsOpened = false;
   document.body.classList.remove("groups-opened");
 }
@@ -1564,10 +1421,6 @@ function toggleControlsSettings() {
 var bCastConnected = false;
 function googleCast() {
   if (sDeviceFamily === "Android") {
-    if (!isPremiumAccessAllowed()) {
-      showModal(getLang("license-fail"));
-      return false;
-    }
     hideChannelSettings();
     m3uConnector.initGoogleCast();
   }
@@ -1597,26 +1450,22 @@ function updateVideoTrackInfo() {
   oChannelTrack.innerHTML = sInfo;
 }
 
-// Get audio tracks, subtitle tracks, resolution, codecs and bitrate
 function loadTrackInfo() {
   if (bTrackInfoLoaded) {
     return true;
   }
 
-  //oChannelTrack.innerHTML = '';
   var sInfo = "";
 
   try {
     switch (sDeviceFamily) {
       case "Browser":
       case "LG":
-        // reset track info and set again
         aSubTitleTracks = [];
         aAudioTracks = [];
         aVideoTracks = [];
 
         if (sCurrentVideoEngine === "dash" && oDashApi) {
-          // Subtitles
           var oTrackInfo = oDashApi.getTracksFor("text");
           if (oTrackInfo) {
             var iTrackInfoCount = oTrackInfo.length;
@@ -1629,7 +1478,6 @@ function loadTrackInfo() {
             }
           }
 
-          // Audio
           var oTrackInfo = oDashApi.getTracksFor("audio");
           if (oTrackInfo) {
             var oCurrentTrack = oDashApi.getCurrentTrackFor("audio");
@@ -1646,7 +1494,6 @@ function loadTrackInfo() {
             }
           }
 
-          // Video
           var oTrackInfo = oDashApi.getTracksFor("video");
           if (oTrackInfo) {
             var oCurrentTrack = oDashApi.getCurrentTrackFor("video");
@@ -1668,15 +1515,7 @@ function loadTrackInfo() {
             }
           }
         } else if (sCurrentVideoEngine === "html") {
-          /*var oTrackInfo = oAvPlayer.textTracks;
-					if( oTrackInfo ) {
-						var iTrackInfoCount = oTrackInfo.length;
-						for( var i = 0; i < iTrackInfoCount; i++ ) {
-							aSubTitleTracks.push({id: i, name: oTrackInfo[i].language + ' - ' + oTrackInfo[i].label});
-						}
-					}*/
         } else if (oHlsApi) {
-          // Subtitles
           var oTrackInfo = oHlsApi.subtitleTracks;
           if (oTrackInfo) {
             var iTrackInfoCount = oTrackInfo.length;
@@ -1688,7 +1527,6 @@ function loadTrackInfo() {
             }
           }
 
-          // Audio
           var oTrackInfo = oHlsApi.audioTracks;
           if (oTrackInfo) {
             var iTrackInfoCount = oTrackInfo.length;
@@ -1712,13 +1550,11 @@ function loadTrackInfo() {
         if (oTrackInfo) {
           var iTrackInfoCount = oTrackInfo.length;
 
-          // reset track info and set again
           aSubTitleTracks = [];
           aAudioTracks = [];
           aVideoTracks = [];
 
           for (var i = 0; i < iTrackInfoCount; i++) {
-            //sInfo += oTrackInfo[i].type + ': ';
             var oExtraInfo = JSON.parse(oTrackInfo[i].extra_info);
             if (oExtraInfo) {
               if (oExtraInfo.fourCC) {
@@ -1741,7 +1577,6 @@ function loadTrackInfo() {
                       oExtraInfo.Height;
                   }
                 } else if (i < 3) {
-                  // AUDIO
                   sInfo += (sInfo ? "<br>" : "") + oExtraInfo.fourCC;
                   if (
                     oExtraInfo.bit_rate &&
@@ -1796,8 +1631,6 @@ function loadTrackInfo() {
 
       case "Android":
       case "Apple":
-        // is updated in CustomPlayer: AnalyticsListener
-        //var oTrackInfo = m3uConnector.getTotalTrackInfo(), sInfo = '';
         break;
     }
 
@@ -1810,14 +1643,6 @@ function loadTrackInfo() {
 }
 
 function switchVideoFormat(sMode) {
-  /*
-	if( sChannelSetting !== 'video' ) {
-		debug('switchVideoFormat not allowed');
-		return false;
-	}*/
-
-  //setVideoFormatSetting(sMode);
-
   if (sMode === false) {
     sMode = getVideoFormatSetting();
   }
@@ -1874,11 +1699,8 @@ function switchVideoTrack(iTrackId) {
         oDashApi.setCurrentTrack(oVideoTracks[iTrackId]);
       }
     } else if (oHlsApi) {
-      //
     } else if (sDeviceFamily === "Samsung" && aVideoTracks.length) {
-      //webapis.avplay.setSelectTrack('VIDEO', iTrackId);
     } else if (sDeviceFamily === "Android" && aVideoTracks.length) {
-      //m3uConnector.setSelectTrack('VIDEO', iTrackId);
     }
     iSelectedVideoTrack = iTrackId;
     debug("Switched video track: " + iTrackId);
@@ -1933,7 +1755,6 @@ function switchSubtitleTrack(iTrackId) {
     if (sCurrentVideoEngine === "dash" && oDashApi) {
       oDashApi.setTextTrack(iTrackId);
     } else if (sCurrentVideoEngine === "html") {
-      //oAvPlayer.textTracks[iTrackId].mode = 'showing';
     } else if (oHlsApi) {
       oHlsApi.subtitleTrack = iTrackId;
     } else if (sDeviceFamily === "Samsung" && aSubTitleTracks.length) {
@@ -1987,7 +1808,6 @@ function buildSubDubForm() {
 
   var sHtml = "";
   if (aAudioTracks || aSubTitleTracks) {
-    // Audio-Tracks
     sHtml +=
       '<div class="channel-setting form-row"><label>' +
       getLang("audioTrack") +
@@ -2022,7 +1842,6 @@ function buildSubDubForm() {
 
     sHtml += '</div><div class="HR"></div>';
 
-    // Subtitle-Tracks
     sHtml +=
       '<div class="channel-setting form-row"><label>' +
       getLang("subtitleTrack") +
@@ -2064,14 +1883,12 @@ function buildSubDubForm() {
   if (aVideoTracks) {
     var iCount = aVideoTracks.length;
     if (iCount) {
-      // Video-Tracks
       sHtml =
         '<div class="HR"></div><div class="channel-setting form-row"><label>' +
         getLang("videoTrack") +
         "</label>";
       sHtml +=
         '<select class="selection setting-button" onchange="switchVideoTrack(this.value);">';
-      //sHtml += '<option value="OFF">' + getLang('channelSettingSubOff') + '</option>';
       for (var i = 0; i < iCount; i++) {
         var sSelectedAttr = "";
         if (iSelectedVideoTrack == aVideoTracks[i].id) {
@@ -2164,7 +1981,6 @@ function toggleChannelEditMode(sMode) {
     bChannelEditModeActive = false;
     showGroups();
     buildNav(true);
-    // Refresh EPG-List
     iSecondsSinceEpgNavListRefresh = 9999;
     iSecondsSinceEpgOverviewRefresh = 9999;
     return false;
@@ -2235,7 +2051,7 @@ function openContextMenu(sType) {
 
   switch (sType) {
     case "channellist":
-      var oSelected = document.querySelector("#channel_list li.selected"); // should only be called from nav
+      var oSelected = document.querySelector("#channel_list li.selected");
       if (oSelected) {
         iCh = oSelected.dataset.channelnum;
       }
@@ -2275,13 +2091,9 @@ function hideContextMenu() {
 function scrollToListItem(oListItem, bSmooth) {
   var oParentBox = oListItem.parentElement.parentElement,
     iBoxHeight = oParentBox.offsetHeight;
-  //iScrolled = oParentBox.scrollTop;
 
   if (bSmooth) {
     oParentBox.classList.add("smooth-scrolling");
-    // also scrolls in the parent box!
-    //oListItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    //oParentBox.scrollTo({top: oListItem.offsetTop - (iBoxHeight * 0.5), behavior: 'smooth'});
   }
 
   oParentBox.scrollTop = oListItem.offsetTop - iBoxHeight * 0.5;
@@ -2485,10 +2297,6 @@ function focusListItem(oSelectedItem) {
     }
 
     getEl("series_nav_list_container").innerHTML = sImage;
-
-    /*if( typeof(loadNavChannelEpgCallback) === 'function' ) {
-			loadNavChannelEpgCallback(iCh);
-		}*/
   }
 }
 
@@ -2500,11 +2308,6 @@ function selectListItem() {
   }
 
   if (iContextMenuEditChannel !== false) {
-    if (!isPremiumAccessAllowed()) {
-      showModal(getLang("license-fail"));
-      return false;
-    }
-
     var oCh = aActiveChannelList[iContextMenuEditChannel];
 
     switch (oSelectedItem.id) {
@@ -2538,10 +2341,6 @@ function selectListItem() {
 
         if (bNavOpened) {
           recreateNavChannel(iContextMenuEditChannel);
-          /*var oNavChannel = getNavChannel(iContextMenuEditChannel);
-					if( oNavChannel ) {
-						oNavChannel.classList.toggle('protected', (oCh.protect === true));
-					}*/
         }
 
         break;
@@ -2559,7 +2358,6 @@ function selectListItem() {
           iCurrentChannel--;
           localStorage.setItem("iCurrentChannel", iCurrentChannel);
         } else if (iContextMenuEditChannel === iCurrentChannel) {
-          // Current channel deleted, load next
           iCurrentChannel = -1;
           loadChannel(iContextMenuEditChannel);
         }
@@ -2602,11 +2400,9 @@ function selectListItem() {
     }
 
     if (sSelectedGroup === "__all") {
-      //removeGroupFilter();
     }
 
     if (sSelectedGroup === "__fav") {
-      //getFavsCount();
       countFavChannels();
       if (!bPlaylistHasFavs) {
         showModal(getLang("errorNoFavouritesYet"));
@@ -2668,7 +2464,6 @@ function selectListItem() {
       default:
         if (sSelectedGroup === "__fav" && !getFavsCount()) {
           showModal(getLang("errorNoFavouritesYet"));
-          //removeGroupFilter();
           return false;
         }
 
@@ -2727,7 +2522,6 @@ function refreshFavStatus() {
   }
 
   if (isFavourite(iCurrentChannel)) {
-    //sOutput = '⭐ ' + sOutput;
     document.body.classList.add("is-favourite-channel");
   } else {
     document.body.classList.remove("is-favourite-channel");
@@ -2810,9 +2604,6 @@ function showChannelName(bShowSmartControls) {
 
   refreshFavStatus();
 
-  // Add current EPG channel info
-  //sLoadingFromDb = false;
-
   if (oCurrentEpisode) {
     var sName = oCurrentEpisode.title;
     if (oCurrentEpisode.episode_num) {
@@ -2856,11 +2647,9 @@ function hideChannelName() {
   bChannelNameOpened = false;
   oChannelInfo.classList.remove("visible");
   oClock.classList.remove("visible");
-  //hideSmartControls();
 }
 
 function channelInput(iNumber) {
-  //hideChannelName();
   clearUi();
 
   if (iChannelInputTimer) {
@@ -2973,15 +2762,13 @@ function getPrevChannelNum(bUseCurrentChannel) {
 }
 
 function initPlayer() {
-  // executed in playlist.js
-
   var iLastStoredChannel = getLastPlayedChannel();
   loadPlayerFrameworkOnce();
   initClock();
   loadChannel(iLastStoredChannel);
 }
 
-var bFirstPlayStatus = 0; // 1 = video ready, 2 = interaction done
+var bFirstPlayStatus = 0;
 function playVideo() {
   if (sDeviceFamily === "Samsung") {
     try {
@@ -2993,1817 +2780,3 @@ function playVideo() {
     return;
   }
 
-  if (bFirstPlayStatus === 0) {
-    hideElement("play_button");
-    bFirstPlayStatus = 1;
-  }
-
-  if (oAvPlayer) {
-    bFirstPlayStatus = 2;
-    hideElement("play_button");
-    oAvPlayer.play();
-  }
-}
-
-function stopVideo() {
-  if (sDeviceFamily === "Samsung") {
-    try {
-      webapis.avplay.stop();
-      bPlaying = false;
-    } catch (e) {
-      debugError(e);
-    }
-  }
-}
-
-function isLive() {
-  try {
-    switch (sDeviceFamily) {
-      case "Browser":
-      case "LG":
-        return oHlsApi.latestLevelDetails && oHlsApi.latestLevelDetails.live;
-      case "Samsung":
-        return webapis.avplay.getStreamingProperty("IS_LIVE") == "1";
-    }
-  } catch (e) {}
-
-  return false;
-}
-
-function togglePlayState() {
-  switch (sDeviceFamily) {
-    case "Browser":
-    case "LG":
-      if (oAvPlayer.paused || oAvPlayer.ended) oAvPlayer.play();
-      else oAvPlayer.pause();
-      break;
-    case "Samsung":
-      if (bPlaying) {
-        webapis.avplay.pause();
-      } else {
-        webapis.avplay.play();
-      }
-      bPlaying = !bPlaying;
-      changeButtonState("playpause");
-      break;
-    case "Android":
-      if (typeof m3uConnector === "object") {
-        if (bPlaying) {
-          m3uConnector.pauseVideo();
-        } else {
-          m3uConnector.resumeVideo();
-        }
-        bPlaying = !bPlaying;
-        changeButtonState("playpause");
-      }
-      break;
-  }
-}
-
-function loadTizenFramework() {
-  oAvPlayer = document.createElement("object");
-  oAvPlayer.id = "player_samsung";
-  oAvPlayer.type = "application/avplayer";
-  document.body.appendChild(oAvPlayer);
-
-  var aAvPlayErrors = {
-    PLAYER_ERROR_NONE: "Operation has successfully completed; no error.",
-    PLAYER_ERROR_INVALID_PARAMETER: "Unable to find the parameter",
-    PLAYER_ERROR_NO_SUCH_FILE: "Unable to find the specified media content",
-    PLAYER_ERROR_INVALID_OPERATION: "Invalid API Call at the moment",
-    PLAYER_ERROR_SEEK_FAILED:
-      "Failed to perform seek operation, or seek operation called during an invalid state",
-    PLAYER_ERROR_INVALID_STATE:
-      "AVPlay API method was called during an invalid state",
-    PLAYER_ERROR_NOT_SUPPORTED_FILE: "Multimedia file type not supported",
-    PLAYER_ERROR_NOT_SUPPORTED_FORMAT: "Multimedia file format not supported",
-    PLAYER_ERROR_INVALID_URI: "Input URI is in an invalid format",
-    PLAYER_ERROR_CONNECTION_FAILED:
-      "Failed multiple attempts to connect to the specified content server",
-    PLAYER_ERROR_GENEREIC: "Failed to create the display window",
-  };
-
-  var oSubtitlesBox = getEl("subtitles");
-  var oListener = {
-    onbufferingstart: function () {
-      //debug("Buffering start.");
-      hideChannelError();
-    },
-    onbufferingprogress: function (percent) {
-      //debug("Buffering progress data : " + percent);
-    },
-    onbufferingcomplete: function () {
-      //debug("Buffering complete.");
-      hideLoader();
-    },
-    onstreamcompleted: function () {
-      //debug("Stream Completed");
-
-      // start again
-      stopVideo();
-      playVideo();
-      //webapis.avplay.play();
-      //webapis.avplay.stop();
-      //bPlayerLoaded = false;
-    },
-    oncurrentplaytime: function (iCurrentTime) {
-      //debug("Current playtime: " + currentTime);
-      updateProgressBar(Math.floor(iCurrentTime / 1000));
-    },
-    onerror: function (eventType) {
-      //debug("onerror: " + eventType);
-
-      // try to reconnect
-      if (
-        eventType === "PLAYER_ERROR_CONNECTION_FAILED" ||
-        eventType === "PLAYER_ERROR_NOT_SUPPORTED_FORMAT" ||
-        eventType === "PLAYER_ERROR_NOT_SUPPORTED_FILE" ||
-        eventType === "PLAYER_ERROR_INVALID_OPERATION"
-      ) {
-        bStreamWasInterrupted = true;
-        if (bChannelWasAlreadyPlaying && tryReconnect()) {
-          debug("onerror tryReconnect");
-          return false;
-        }
-      }
-
-      var sError = getLang("channelLoadError"),
-        sCodeError = "Code: " + eventType;
-      if (aAvPlayErrors[eventType]) {
-        sCodeError = aAvPlayErrors[eventType] + "<br>" + sCodeError;
-      }
-
-      if (
-        eventType == "PLAYER_ERROR_NOT_SUPPORTED_FILE" ||
-        eventType == "PLAYER_ERROR_INVALID_URI"
-      ) {
-        sError = getLang("channelNotSupportedFile");
-      }
-
-      showChannelError(sError, sCodeError);
-      stopVideo();
-      bPlayerLoaded = false;
-    },
-    onerrormsg: function (eventType, eventMsg) {
-      //debug("onerrormsg type error : " + eventType);
-      //debug("onerrormsg message : " + eventMsg);
-    },
-    onevent: function (eventType, eventData) {
-      if (
-        eventType === "PLAYER_MSG_BITRATE_CHANGE" ||
-        eventType === "PLAYER_MSG_RESOLUTION_CHANGED"
-      ) {
-        if (bChannelSettingsOpened && webapis.avplay.getState() === "PLAYING") {
-          bTrackInfoLoaded = false;
-          loadTrackInfo();
-        }
-      }
-
-      //debug("onevent: " + eventType + ", data: " + eventData);
-      //debug(webapis.avplay.getState());
-      //debug(webapis.avplay.getCurrentStreamInfo());
-    },
-    onsubtitlechange: function (duration, sText, data3, data4) {
-      if (bSubtitlesActive) {
-        oSubtitlesBox.innerHTML = sText;
-      }
-    },
-    ondrmevent: function (drmEvent, drmData) {
-      //debug("DRM callback: " + drmEvent);
-      //debug(drmData);
-
-      if (
-        drmData.name === "Challenge" &&
-        aCurrentChannel &&
-        aCurrentChannel.drmT &&
-        aCurrentChannel.drmK
-      ) {
-        var sRequestSessionId = drmData.session_id,
-          oHttp = new XMLHttpRequest(),
-          sChallengeData = drmData.challenge;
-        oHttp.open("POST", aCurrentChannel.drmK);
-        if (aCurrentChannel.drmT === "playready") {
-          oHttp.responseType = "text";
-          oHttp.setRequestHeader("Content-Type", "text/xml");
-          oHttp.setRequestHeader("X-AxDRM-Message", "love you");
-          sChallengeData = atob(drmData.challenge);
-        } else {
-          oHttp.responseType = "arraybuffer";
-          sChallengeData = base64ToBytes(drmData.challenge);
-        }
-
-        //debug("ondrmevent loading license from: " + aCurrentChannel.drmK);
-
-        oHttp.onreadystatechange = function () {
-          if (oHttp.readyState == XMLHttpRequest.DONE) {
-            // oHttpRequest.DONE == 4
-            if (oHttp.status < 400) {
-              //var sLicenseData = new Uint8Array(oHttp.response); //btoa(oHttp.response);
-              switch (aCurrentChannel.drmT) {
-                case "com.widevine.alpha":
-                case "widevine":
-                  var sLicenseData = btoa(
-                    new Uint8Array(oHttp.response).reduce(function (
-                      data,
-                      byte
-                    ) {
-                      return data + String.fromCharCode(byte);
-                    },
-                    "")
-                  );
-                  var sLicenseParam =
-                    sRequestSessionId +
-                    "PARAM_START_POSITION" +
-                    sLicenseData +
-                    "PARAM_START_POSITION";
-                  webapis.avplay.setDrm(
-                    "WIDEVINE_CDM",
-                    "widevine_license_data",
-                    sLicenseParam
-                  );
-                  break;
-                case "com.microsoft.playready":
-                case "playready":
-                  webapis.avplay.setDrm(
-                    "PLAYREADY",
-                    "InstallLicense",
-                    btoa(oHttp.response)
-                  );
-                  break;
-              }
-            }
-          }
-        };
-
-        oHttp.send(sChallengeData);
-        return;
-      }
-
-      if (drmData.name === "DrmError") {
-        debug("drmError -> stopVideo");
-        stopVideo();
-        webapis.avplay.close();
-      }
-    },
-  };
-
-  webapis.avplay.setListener(oListener);
-}
-
-/*
-	Returns true, if reconnection attempt
-*/
-function tryReconnect() {
-  try {
-    //debug('Connection lost. Try to reconnect!');
-    if (iReconnectTimer) {
-      debug("tryReconnect old timer cleared");
-      clearTimeout(iReconnectTimer);
-      iReconnectTimer = false;
-    }
-
-    if (iCurrentChannel && iRetryChannelLoad < 5) {
-      debug("tryReconnect timer started");
-      showLoader();
-      iReconnectTimer = setTimeout(function () {
-        iRetryChannelLoad++;
-        iReconnectTryAfter = iReconnectTryAfter * 2;
-        debug("tryReconnect. Times: " + iRetryChannelLoad);
-        stopVideo();
-        playVideo();
-      }, iReconnectTryAfter);
-
-      return true;
-    }
-  } catch (e) {
-    debugError(e);
-  }
-
-  return false;
-}
-
-/*
-class ForceOriginalPlaylistLoader extends Hls.DefaultConfig.loader {
-  static originalPlaylistUrl = null;
-
-  load(context, config, callbacks) {
-    if (context.type === 'manifest') {
-	  // Save the original manifest URL (only once)
-      if (!ForceOriginalPlaylistLoader.originalPlaylistUrl) {
-        ForceOriginalPlaylistLoader.originalPlaylistUrl = context.url;
-      }
-    }
-
-    if (context.type === 'level') {
-	  // Override redirected level playlist URL with original one
-      if (ForceOriginalPlaylistLoader.originalPlaylistUrl) {
-        context.url = ForceOriginalPlaylistLoader.originalPlaylistUrl;
-      }
-    }
-
-    super.load(context, config, callbacks);
-  }
-}
-*/
-
-function loadHlsFramework() {
-  bHlsFrameworkLoaded = true;
-
-  var bTryFallbackPlayback = false;
-
-  oAvPlayer.addEventListener("abort", function () {
-    //debug('abort');
-  });
-  oAvPlayer.addEventListener("canplay", function () {
-    //debug('canplay');
-    if (bFirstPlayStatus) {
-      oAvPlayer.play();
-    }
-
-    bTryFallbackPlayback = false;
-    hideLoader();
-    localStorage.setItem("iCurrentChannel", iCurrentChannel);
-    //localStorage.setItem('sLastChannelName', sCurrentChannelName);
-
-    var bHasSubtitles = false;
-    if (sCurrentVideoEngine === "dash" && oDashApi) {
-      bHasSubtitles = oDashApi.getTracksFor("text").length;
-    } else if (sCurrentVideoEngine === "html") {
-      //bHasSubtitles = oAvPlayer.textTracks.length;
-    } else if (oHlsApi) {
-      bHasSubtitles = oHlsApi.subtitleTracks.length;
-    }
-
-    if (bHasSubtitles) {
-      showElement("cs_subtitles");
-    } else {
-      hideElement("cs_subtitles");
-    }
-
-    if (bChannelSettingsOpened) {
-      buildSubDubForm();
-    }
-  });
-  oAvPlayer.addEventListener("loadstart", function () {
-    //debug('loadstart');
-    showLoader();
-    if (bFirstPlayStatus === 0) {
-      showElement("play_button");
-    }
-  });
-  oAvPlayer.addEventListener("playing", function () {
-    //debug('playing');
-    hideElement("play_button");
-    bFirstPlayStatus = 1;
-    hideLoader();
-    hideChannelError();
-  });
-  oAvPlayer.addEventListener("error", function (ev) {
-    var sError = getLang("channelLoadError");
-    showChannelError(sError, "Connection error");
-    debug("error", ev);
-    hideLoader();
-  });
-  oAvPlayer.addEventListener("suspend", function () {
-    //debug('suspend');
-    hideLoader();
-  });
-  oAvPlayer.addEventListener("ended", function () {
-    //debug('ended');
-    hideLoader();
-  });
-  oAvPlayer.addEventListener("waiting", function () {
-    //debug('waiting');
-    showLoader();
-  });
-  oAvPlayer.addEventListener("stalled", function () {
-    debug("stalled");
-    //showLoader();
-  });
-
-  if (Hls.isSupported()) {
-    oHlsOptions.maxAudioFramesDrift = 0;
-    //oHlsOptions.loader = ForceOriginalPlaylistLoader;
-    //oHlsOptions.progressive = true;
-
-    oHlsApi = new Hls(oHlsOptions);
-    applyBufferSetting();
-    oHlsApi.attachMedia(oAvPlayer);
-    oHlsApi.subtitleDisplay = false;
-
-    oHlsApi.on(Hls.Events.LEVEL_SWITCHED, function (event, data) {
-      var oCurrentLevel = oHlsApi.levelController.levels[oHlsApi.currentLevel],
-        aAttrs = oCurrentLevel.attrs;
-      if (aAttrs && aAttrs["CODECS"]) {
-        oChannelTrack.innerHTML = "codecs: " + aAttrs["CODECS"];
-        oChannelTrack.innerHTML += "<br>resolution: " + aAttrs["RESOLUTION"];
-        if (oCurrentLevel.bitrate) {
-          var iMbits = (oCurrentLevel.bitrate / 1000000).toFixed(3);
-          oChannelTrack.innerHTML += "<br>bitrate: " + iMbits + " Mbit/s";
-        }
-      }
-    });
-
-    /*
-		oHlsApi.on(Hls.Events.MEDIA_ATTACHED, function () {
-			debug('video and hls.js are now bound together !');
-			oHlsApi.loadSource('http://my.streamURL.com/playlist.m3u8');
-			oHlsApi.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
-				debug(
-				  'manifest loaded, found ' + data.levels.length + ' quality level'
-				);
-				oAvPlayer.play();
-			});
-		});
-
-
-		oHlsApi.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, function(text) {
-			if( bSubtitlesActive ) {
-				if( text ) {
-					oSubtitlesBox.style.display = 'block';
-					oSubtitlesBox.innerHTML = text;
-				} else {
-					oSubtitlesBox.style.display = 'none';
-				}
-			}
-		});*/
-
-    oHlsApi.on(Hls.Events.ERROR, function (eventType, data) {
-      //console.log("onerror: " + eventType);
-
-      var sError = getLang("channelLoadError");
-
-      //console.log(data);
-
-      if (data.fatal) {
-        if (bTryFallbackPlayback) {
-          showChannelError(sError, "Code: " + data.error.message);
-          hideLoader();
-          return;
-        }
-
-        try {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              // try to recover network error
-              console.log("fatal network error encountered, try to recover");
-              //console.log(data);
-
-              if (
-                data.details == "manifestLoadError" ||
-                data.details == "manifestParsingError"
-              ) {
-                // Maybe CORS? Try setting src direct into video tag
-                oAvPlayer.src = sPlayingUrl; //data.url;
-                //showChannelError(sError, 'Code: ' + data.type + ' - ' + data.details);
-                break;
-              }
-
-              if (
-                data.details == "levelParsingError" ||
-                data.details == "levelEmptyError"
-              ) {
-                /*if( data.url !== sPlayingUrl ) {
-									bTryFallbackPlayback = true;
-									oAvPlayer.src = sPlayingUrl;
-									break;
-								}*/
-
-                showChannelError(
-                  sError,
-                  "Data received from server is broken. If this error persists, contact your IPTV provider."
-                );
-                hideLoader();
-                break;
-              }
-
-              if (data.details == "keyLoadError") {
-                showChannelError(sError, "Code: " + data.error.message);
-                hideLoader();
-                break;
-              }
-
-              try {
-                bTryFallbackPlayback = true;
-                oHlsApi.startLoad(); // can load last channel
-              } catch (e) {
-                debugError(e);
-              }
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              oAvPlayer.src = data.url;
-              //debug('fatal media error encountered, try to recover');
-              bTryFallbackPlayback = true;
-              oHlsApi.recoverMediaError();
-              break;
-
-            case Hls.ErrorTypes.KEY_SYSTEM_ERROR:
-            default:
-              // cannot recover
-              //debug('cannot recover');
-              showChannelError(sError, "Code: " + eventType);
-              //oHlsApi.destroy();
-              break;
-          }
-        } catch (e) {
-          debugError(e);
-          showChannelError(sError, "Code: " + e.message);
-        }
-      }
-
-      if (eventType == "PLAYER_ERROR_CONNECTION_FAILED") {
-        //sError += '<br>' + getLang('channelLoadConnectionFailed');
-      }
-      if (
-        eventType == "PLAYER_ERROR_NOT_SUPPORTED_FILE" ||
-        eventType == "PLAYER_ERROR_INVALID_URI"
-      ) {
-        sError = getLang("channelNotSupportedFile");
-      }
-      if (eventType == "PLAYER_ERROR_") {
-        //sError += '<br>' + getLang('');
-      }
-
-      //stopVideo();
-      bPlayerLoaded = false;
-    });
-  }
-}
-
-function loadDashFramework() {
-  bDashFrameworkLoaded = true;
-
-  oDashApi = dashjs.MediaPlayer().create();
-  oDashApi.initialize();
-  oDashApi.updateSettings({
-    debug: {
-      //'logLevel': dashjs.Debug.LOG_LEVEL_INFO
-    },
-    streaming: {
-      scheduling: {
-        scheduleWhilePaused: false,
-      },
-      buffer: {
-        fastSwitchEnabled: true,
-      },
-    },
-  });
-
-  oDashApi.setAutoPlay(true);
-  //oDashApi.attachView(oDashPlayer);
-  //oDashApi.attachSource(url);
-}
-
-// Is executed in android / java
-function channelPlayingCallback() {
-  hideLoader();
-  localStorage.setItem("iCurrentChannel", iCurrentChannel);
-  //localStorage.setItem('sLastChannelName', sCurrentChannelName);
-  hideChannelError();
-}
-
-function loadPlayerFrameworkOnce() {
-  if (bFrameworkLoaded) {
-    return false;
-  }
-
-  switch (sDeviceFamily) {
-    case "Browser":
-    case "LG":
-      loadHlsFramework();
-      break;
-    case "Samsung":
-      loadTizenFramework();
-      break;
-  }
-
-  bFrameworkLoaded = true;
-
-  document.addEventListener("visibilitychange", function () {
-    try {
-      if (document.hidden) {
-        // Something you want to do when hide or exit.
-        clearUi();
-        if (sDeviceFamily === "Samsung") {
-          stopVideo();
-          webapis.avplay.suspend();
-
-          bProtectionUnlocked = false;
-          body.classList.remove("unlocked");
-        }
-      } else {
-        // Something you want to do when resume.
-        if (sDeviceFamily === "Samsung") {
-          webapis.avplay.restore();
-          if (iCurrentChannel && webapis.avplay.getState() !== "PLAYING") {
-            debug("load last channel");
-            var iLastCh = iCurrentChannel;
-            iCurrentChannel = false; // Force reload channel
-            loadChannel(iLastCh);
-          }
-        }
-      }
-    } catch (e) {
-      debugError(e);
-    }
-  });
-}
-
-function buildNav(bSkipCurrentChannelSelect) {
-  //aActiveChannelList = aLoadedPlaylists[iCurrentPlaylistId].channels;
-
-  var bSkipCurrentChannelSelect = bSkipCurrentChannelSelect || false,
-    aGroups = {},
-    sListPoints = "",
-    sGroupListPoints = "",
-    iChCount = 0,
-    sActiveClass = "",
-    iChannelsCount = aActiveChannelList.length;
-
-  // Playlists
-  if (!sPlaylistNav) {
-    sPlaylistNav = '<li id="current_playlist">No playlists yet!</li>';
-  }
-
-  sActiveClass = sSelectedGroup === "__fav" ? 'class="active"' : "";
-  sGroupListPoints +=
-    '<li id="favourites_group" ' +
-    sActiveClass +
-    ' data-group="__fav" class="i18n" data-langid="favourites" data-prev="category_list">' +
-    getLang("favourites") +
-    "</li>";
-
-  sActiveClass =
-    !sSelectedGroup || sSelectedGroup === "__all" ? 'class="active"' : "";
-  sGroupListPoints +=
-    '<li id="all_channels_group" ' +
-    sActiveClass +
-    ' data-group="__all" class="i18n" data-langid="allChannels">' +
-    getLang("allChannels") +
-    "</li>";
-
-  aFilteredChannelList = [];
-  aChannelOrder = [];
-  aLazyLoadedChannels = [];
-  aLazyLoadedEpgChannels = [];
-  iVisibleChannels = 0;
-  iFavChannels = 0;
-  bPlaylistHasFavs = false;
-
-  for (var i = 0; i < iChannelsCount; i++) {
-    var oChannel = aActiveChannelList[i];
-    /*if( aForcedPositions[i] ) {
-			oChannel = aForcedPositions[i];
-			aForcedPositions[i] = null;
-		}*/
-
-    if (!oChannel) {
-      continue;
-    }
-    if (oChannel.protect && !bProtectionUnlocked && bHideProtected) {
-      continue;
-    }
-
-    iChCount++;
-
-    oChannel.order = null;
-
-    if (sFilterCategory && oChannel.type && sFilterCategory !== oChannel.type) {
-      continue;
-    } // Live, Movie, Series
-
-    var sName = oChannel.name,
-      sGroup = oChannel.group,
-      aChannelGroups = false;
-
-    if (sGroup && sGroup.indexOf(";") > 1) {
-      aChannelGroups = sGroup.split(";");
-      aChannelGroups.forEach(function (sGr) {
-        if (typeof aGroups[sGr] === "undefined") {
-          aGroups[sGr] = 0;
-        }
-      });
-    } else {
-      if (typeof aGroups[sGroup] === "undefined") {
-        aGroups[sGroup] = 0; // Count channels in groups
-      }
-    }
-
-    if (!bPlaylistHasFavs && isFavourite(i)) {
-      bPlaylistHasFavs = true;
-    }
-
-    if (
-      sFilter &&
-      sGroup &&
-      sName.toLowerCase().indexOf(sFilter) === -1 &&
-      sGroup.toLowerCase().indexOf(sFilter) === -1
-    ) {
-      continue;
-    }
-
-    if (aChannelGroups) {
-      aChannelGroups.forEach(function (sGr) {
-        aGroups[sGr]++;
-      });
-    } else {
-      aGroups[sGroup]++;
-    }
-
-    var bIsFav = bPlaylistHasFavs && isFavourite(i);
-    if (bIsFav) {
-      iFavChannels++;
-    }
-
-    if (sSelectedGroup === "__fav") {
-      if (!bIsFav) {
-        continue;
-      }
-    } else if (sSelectedGroup === "__all") {
-      // Keine Filter
-    } else if (sSelectedGroup) {
-      var bFound = false;
-      if (aChannelGroups) {
-        aChannelGroups.forEach(function (sGr) {
-          if (sSelectedGroup === sGr) {
-            bFound = true;
-          }
-        });
-      } else {
-        bFound = sSelectedGroup === sGroup;
-      }
-
-      if (!bFound) {
-        continue;
-      }
-    }
-
-    if (iCurrentChannel == i) {
-      //sClass += ' active';
-      iScrollToActiveChannel = iVisibleChannels;
-    }
-
-    aFilteredChannelList[i] = iVisibleChannels;
-    aChannelOrder[iVisibleChannels] = i;
-    oChannel.order = iVisibleChannels;
-    iVisibleChannels++;
-
-    // Is done lazy
-    //sListPoints += '<li id="nav_ch_' + (i+1) + '" class="' + sClass + '" data-channelnum="' + (i+1) + '" onmouseenter="focusListItem(this)"></li>';
-  }
-
-  for (var sKey in aGroups) {
-    sActiveClass = sSelectedGroup === sKey ? 'class="active"' : "";
-    sGroupListPoints +=
-      '<li id="nav_gr_' +
-      sKey +
-      '" ' +
-      sActiveClass +
-      ' data-group="' +
-      sKey +
-      '">' +
-      sKey +
-      " (" +
-      aGroups[sKey] +
-      ")</li>";
-  }
-
-  if (sFilter && iVisibleChannels == 0) {
-    sListPoints +=
-      '<li id="no_channels_filter_hint">' +
-      getLang("filter-no-results") +
-      "</li>";
-  }
-
-  iChannelListHeight = iNavChannelHeight * iVisibleChannels;
-  oChannelListUl.style.height = iChannelListHeight + "px";
-  oChannelListUl.innerHTML = sListPoints;
-  getEl("dynamic_groups_list").innerHTML = sGroupListPoints;
-  getEl("dynamic_playlists_list").innerHTML = sPlaylistNav;
-
-  if (!bSkipCurrentChannelSelect) {
-    selectNavChannel();
-  }
-
-  if (bNavOpened) {
-    bEpgNavListBuilt = false;
-    buildEpgNavList();
-    syncScrollEpgList(oChannelList);
-  }
-
-  channelScrollEvent(); // Lazy load
-}
-
-/*function lazyLoadChannel( i ) {
-
-	i = parseInt(i);
-
-	if( aLazyLoadedChannels.includes(i) || !aActiveChannelList[i] ) {
-		return false;
-	}
-
-	aLazyLoadedChannels.push(i);
-
-	var sName = aActiveChannelList[i].name, sChannelLogo = '', oChannel = getEl('nav_ch_' + (i+1));
-	if( sName && oChannel ) {
-		if( typeof(aActiveChannelList[i].logo) === 'string' ) {
-			sChannelLogo = '<div class="nav_logo"><img src="' + aActiveChannelList[i].logo + '" alt="" /></div>';
-		}
-		var sListChannel = '<span class="list-ch">' + (i+1) + '</span> <span class="list-title">' + sName + '</span>' + sChannelLogo;
-		oChannel.innerHTML = sListChannel;
-		oChannel.classList.remove('lazy');
-	}
-
-}*/
-
-function getNavChannel(i) {
-  var oChannel = getEl("nav_ch_" + i);
-  if (!oChannel) {
-    oChannel = lazyLoadChannel(i);
-  }
-
-  return oChannel;
-}
-
-function recreateNavChannel(i) {
-  var oChannel = getEl("nav_ch_" + i);
-  if (oChannel) {
-    var bWasSelected = oChannel.classList.contains("selected");
-    oChannel.remove();
-    oChannel = createNavChannel(i);
-    if (bWasSelected) {
-      oChannel.classList.add("selected");
-    }
-    if (!aLazyLoadedChannels.includes(i)) {
-      aLazyLoadedChannels.push(i);
-    }
-  }
-  return oChannel;
-}
-
-function getChannelHtml(iChNum, sTitleId) {
-  var aCurChannel = aActiveChannelList[iChNum],
-    sName = aCurChannel.cname ? aCurChannel.cname : aCurChannel.name;
-  if (!aCurChannel || !sName) {
-    return "";
-  }
-
-  var sEditAttributes = "";
-  if (sTitleId) {
-    sEditAttributes =
-      ' id="' + sTitleId + '" onclick="showRenameInput(' + iChNum + ');" ';
-  }
-
-  var sHtml =
-    '<span class="list-ch">' +
-    (iChNum + 1) +
-    "</span> <span " +
-    sEditAttributes +
-    ' class="list-title">' +
-    sName +
-    "</span>";
-
-  if (aCurChannel.x_series_id && aCurChannel.type === "series") {
-    sHtml += '<div class="nav_logo icon icon-series"></div>';
-  } else if (aCurChannel.x_stream_id && aCurChannel.type === "movie") {
-    sHtml += '<div class="nav_logo icon icon-movies"></div>';
-  } else if (typeof aCurChannel.logo === "string") {
-    sHtml +=
-      '<div class="nav_logo"><img src="' +
-      aCurChannel.logo +
-      '" alt="" /></div>';
-  }
-
-  return sHtml;
-}
-
-function createNavChannel(i) {
-  var aCurChannel = aActiveChannelList[i];
-  if (!aCurChannel || !aCurChannel.name || aCurChannel.deleted) {
-    return false;
-  }
-
-  var iOrderNum = aCurChannel.order;
-  if (typeof iOrderNum !== "number") {
-    return false;
-  }
-
-  var oChannel = document.createElement("li");
-  oChannel.id = "nav_ch_" + i;
-  oChannel.dataset.channelnum = i;
-  oChannel.innerHTML = getChannelHtml(i);
-  oChannel.style.top = iOrderNum * iNavChannelHeight + "px";
-  oChannel.dataset.order = iOrderNum;
-  oChannel.onmouseenter = function () {
-    focusListItem(this);
-  };
-
-  if (iCurrentChannel == i) {
-    oChannel.className = "active";
-  }
-
-  if (aCurChannel.protect) {
-    oChannel.classList.add("protected");
-    if (!bProtectionUnlocked && bHideProtected) {
-      oChannel.classList.add("invisible");
-      return oChannel;
-    }
-  }
-
-  if (isFavourite(i)) {
-    oChannel.classList.add("fav");
-  }
-
-  if (aCurChannel.x_series_id && aCurChannel.type === "series") {
-    oChannel.classList.add("series");
-  } else if (aCurChannel.x_stream_id && aCurChannel.type === "movie") {
-    oChannel.classList.add("movie");
-  }
-
-  oChannelListUl.appendChild(oChannel);
-
-  return oChannel;
-}
-
-function lazyLoadChannel(iChNum) {
-  iChNum = parseInt(iChNum);
-
-  if (aLazyLoadedChannels.includes(iChNum) || !aActiveChannelList[iChNum]) {
-    return false;
-  }
-
-  // Truncate nav next time it is opened if there were too many items loaded
-  if (aLazyLoadedChannels.length > 100) {
-    bNeedNavRefresh = true;
-  }
-
-  aLazyLoadedChannels.push(iChNum);
-  return createNavChannel(iChNum);
-}
-
-function calculateScrollbarTop(scrollTop, boxHeight, contentHeight) {
-  var maxScrollTop = contentHeight - boxHeight; // Maximum scrollable distance
-  if (scrollTop > maxScrollTop) scrollTop = maxScrollTop; // Clamp scrollTop to avoid overscroll
-  return (scrollTop / maxScrollTop) * (boxHeight - 50);
-}
-
-function channelScrollEvent() {
-  syncScrollEpgList(oChannelList);
-
-  var iTop = oChannelList.scrollTop,
-    iChannelBoxHeight = oChannelList.offsetHeight,
-    iVisibleChannelTop = Math.floor(iTop / iNavChannelHeight),
-    iVisibleChannelBottom = (iTop + iChannelBoxHeight + 10) / iNavChannelHeight;
-
-  //var iScrollbarTop = calculateScrollbarTop(iTop, iChannelBoxHeight, iChannelListHeight);
-  //oChannelListScrollbar.style.top = iScrollbarTop + 'px';
-
-  if (iVisibleChannelBottom && aChannelOrder) {
-    if (iVisibleChannelBottom < 8) {
-      iVisibleChannelBottom = 8;
-    }
-
-    for (var i = iVisibleChannelTop; i < iVisibleChannelBottom; i++) {
-      if (aChannelOrder[i] >= 0) {
-        lazyLoadChannel(aChannelOrder[i]);
-        lazyLoadEpgNavChannel(aChannelOrder[i]);
-      }
-    }
-  }
-}
-
-function selectNavChannel(iForceChannel) {
-  iForceChannel = iForceChannel || iCurrentChannel;
-  var oNavChannel = getNavChannel(iForceChannel);
-
-  if (!oNavChannel) {
-    oNavChannel = getNavChannel(aChannelOrder[0]);
-    if (!oNavChannel) {
-      oNavChannel = document.querySelector("#channel_list li:first-child");
-    }
-  }
-
-  if (oNavChannel) {
-    oSelectedItem = oNavChannel;
-    oNavChannel.classList.add("selected");
-    scrollToListItem(oNavChannel);
-  }
-}
-
-function getChannelKey(iChNum) {
-  var oCh = aActiveChannelList[iChNum];
-  return oCh ? oCh.name + "|" + oCh.tvgid + "|" + oCh.tvgn : false;
-}
-
-function getFavourites() {
-  if (!aFavourites) {
-    aFavourites = localStorage.getItem("aFavourites");
-    if (!aFavourites) {
-      aFavourites = {};
-    } else {
-      aFavourites = JSON.parse(aFavourites);
-    }
-  }
-  return aFavourites;
-}
-
-function setFavourite(iChNum) {
-  var aFavTmp = getFavourites(),
-    sKey = getChannelKey(iChNum);
-
-  if (sKey) {
-    aFavTmp[sKey] = 1;
-  }
-
-  aFavourites = aFavTmp;
-  localStorage.setItem("aFavourites", JSON.stringify(aFavourites));
-
-  var oNavChannel = getNavChannel(iChNum);
-  if (oNavChannel) {
-    oNavChannel.classList.add("fav");
-  }
-
-  if (
-    !bNavOpened &&
-    !bChannelSettingsOpened &&
-    iContextMenuEditChannel === false
-  ) {
-    showChannelName();
-  }
-}
-
-function removeFavourite(iChNum) {
-  var aFavTmp = getFavourites(),
-    sKey = getChannelKey(iChNum);
-
-  if (sKey && aFavTmp && aFavTmp[sKey]) {
-    delete aFavTmp[sKey];
-    aFavourites = aFavTmp;
-    localStorage.setItem("aFavourites", JSON.stringify(aFavourites));
-
-    var oNavChannel = getNavChannel(iChNum);
-    if (oNavChannel) {
-      oNavChannel.classList.remove("fav");
-    }
-  }
-
-  if (
-    !bNavOpened &&
-    !bChannelSettingsOpened &&
-    iContextMenuEditChannel === false
-  ) {
-    showChannelName();
-  }
-}
-
-function countFavChannels() {
-  iFavChannels = 0;
-  bPlaylistHasFavs = false;
-  var iChannelsCount = aActiveChannelList.length;
-  for (var i = 0; i < iChannelsCount; i++) {
-    if (isFavourite(i)) {
-      iFavChannels++;
-      bPlaylistHasFavs = true;
-    }
-  }
-
-  return iFavChannels;
-}
-
-function getFavsCount() {
-  if (iFavChannels === false) {
-    iFavChannels = countFavChannels();
-  }
-
-  return iFavChannels;
-}
-
-function isFavourite(iChNum) {
-  var aFavTmp = getFavourites(),
-    sKey = getChannelKey(iChNum);
-  return (
-    sKey && aFavTmp && typeof aFavTmp[sKey] !== "undefined" && aFavTmp[sKey]
-  );
-}
-
-function toggleFavourite(iChNum) {
-  if (iChNum === "FROMLIST") {
-    var oSelected = document.querySelector("#channel_list li.selected");
-    if (oSelected && oSelected.dataset.channelnum) {
-      iChNum = oSelected.dataset.channelnum;
-    }
-    if (!iChNum) {
-      return false;
-    }
-  }
-
-  var bFavAdded = false;
-
-  if (isFavourite(iChNum)) {
-    removeFavourite(iChNum);
-  } else {
-    setFavourite(iChNum);
-    bFavAdded = true;
-  }
-
-  bNeedNavRefresh = true;
-  iFavChannels = false; // Recount if needed in getFavsCount()
-
-  refreshFavStatus();
-
-  if (iChNum == iCurrentChannel) {
-    if (bChannelSettingsOpened || iContextMenuEditChannel !== false) {
-      // Do nothing
-    } else if (!bNavOpened) {
-      showChannelName();
-    }
-  }
-
-  if (bNavOpened && sSelectedGroup === "__fav") {
-    if (!getFavsCount()) {
-      removeGroupFilter();
-    }
-
-    buildNav();
-  }
-
-  return bFavAdded;
-}
-
-function showSubtitles() {
-  if (sDeviceFamily === "Android") {
-    m3uConnector.showSubtitlesView();
-    hideChannelSettings();
-    return true;
-  }
-
-  if (!bSubtitlesActive) {
-    bSubtitlesActive = true;
-    document.body.classList.add("sub-enabled");
-    switch (sDeviceFamily) {
-      case "Browser":
-      case "LG":
-        if (sCurrentVideoEngine === "dash") {
-          oDashApi.enableText(bSubtitlesActive);
-        } else {
-          oHlsApi.subtitleDisplay = bSubtitlesActive;
-        }
-
-        getEl("cs_subtitles").classList.add("active"); // Controls-Button
-        break;
-      case "Samsung":
-        // Div with ID "subtitles" is displayed with CSS
-        //webapis.avplay.setSilentSubtitle(false);
-        getEl("subtitles").innerHTML = "";
-        break;
-      case "Android":
-        m3uConnector.enableSubtitles();
-        break;
-    }
-  }
-}
-
-function hideSubtitles() {
-  if (bSubtitlesActive) {
-    bSubtitlesActive = false;
-    document.body.classList.remove("sub-enabled");
-    switch (sDeviceFamily) {
-      case "Browser":
-      case "LG":
-        if (sCurrentVideoEngine === "dash") {
-          oDashApi.enableText(bSubtitlesActive);
-        } else {
-          oHlsApi.subtitleDisplay = bSubtitlesActive;
-        }
-        getEl("cs_subtitles").classList.remove("active");
-        break;
-      case "Samsung":
-        //webapis.avplay.setSilentSubtitle(true);
-        getEl("subtitles").innerHTML = "";
-        break;
-      case "Android":
-        m3uConnector.disableSubtitles();
-        break;
-    }
-  }
-}
-
-function toggleSubtitles() {
-  if (bSubtitlesActive) {
-    hideSubtitles();
-  } else {
-    showSubtitles();
-  }
-}
-
-function toggleAudio() {
-  if (sDeviceFamily === "Android") {
-    m3uConnector.showAudioTrackView();
-    hideChannelSettings();
-    return true;
-  }
-}
-
-function toggleVideo() {
-  if (sDeviceFamily === "Android") {
-    m3uConnector.showVideoTrackView();
-    hideChannelSettings();
-    return true;
-  }
-}
-
-function enableChannelMoveMode(iCh) {
-  if (bMoveChannelFieldActive) {
-    return;
-  }
-
-  bMoveChannelFieldActive = true;
-
-  if (!bNavOpened) {
-    showNav();
-  }
-
-  hideContextMenu();
-
-  oNavMoveChannel = getNavChannel(iCh);
-  if (oNavMoveChannel) {
-    oNavMoveChannel.classList.add("move-channel");
-
-    if (!oMoveChannelInput) {
-      oMoveChannelInput = document.createElement("input");
-      oMoveChannelInput.id = "input_move_field";
-      oMoveChannelInput.type = "number";
-      oMoveChannelInput.min = 0;
-      oMoveChannelInput.max = aActiveChannelList.length;
-      oMoveChannelInput.autocomplete = "off";
-    }
-
-    oNavMoveChannel.insertBefore(oMoveChannelInput, oNavMoveChannel.firstChild);
-
-    oMoveChannelInput.value = iCh + 1;
-    oMoveChannelInput.onblur = function () {
-      moveChannelPos(0);
-    };
-
-    oMoveChannelInput.focus();
-  }
-}
-
-function moveChannelPos(iDir) {
-  var iNewPos = parseInt(oMoveChannelInput.value);
-
-  if (iDir == 1) {
-    iNewPos++;
-    if (iNewPos > aActiveChannelList.length) {
-      return;
-    }
-    oMoveChannelInput.value = iNewPos;
-  } else if (iDir == -1) {
-    iNewPos--;
-    if (iNewPos < 0) {
-      return;
-    }
-    oMoveChannelInput.value = iNewPos;
-    //oNavMoveChannel.style.top = (iNewPos * iNavChannelHeight) + 'px';
-  } else {
-    var iCh = oNavMoveChannel.dataset.channelnum,
-      oCh = aActiveChannelList[iCh];
-    if (oCh) {
-      if (oCh.fpos) {
-        // remove from aForcedPosChannels
-      }
-
-      oCh.fpos = iNewPos - 1;
-      oCh.fposDate = new Date().getTime();
-      saveChannel(oCh, function () {
-        //aActiveChannelList = sortChannelList(aChannelList);
-        //aForcedPosChannels.push(oCh);
-
-        hideChannelPosInput();
-        if (bNavOpened) {
-          buildNav(true);
-          selectNavChannel(iNewPos - 1);
-        }
-      });
-    }
-  }
-}
-
-function hideChannelPosInput() {
-  if (oNavMoveChannel) {
-    oNavMoveChannel.classList.remove("move-channel");
-  }
-
-  if (oMoveChannelInput) {
-    oMoveChannelInput.blur();
-    oMoveChannelInput.remove();
-    //oMoveChannelInput = false;
-  }
-
-  bMoveChannelFieldActive = false;
-}
-
-var bRenameFieldActive = false,
-  oRenameItem = false;
-function showRenameInput(iCh) {
-  if (!isPremiumAccessAllowed()) {
-    showModal(getLang("license-fail"));
-    return false;
-  }
-
-  if (bRenameFieldActive) {
-    return;
-  }
-
-  if (!oRenameItem) {
-    oRenameItem = document.createElement("input");
-    oRenameItem.id = "input_editor_field";
-    oRenameItem.type = "text";
-    oRenameItem.className = "text";
-    oRenameItem.autocomplete = "off";
-  }
-
-  var oCh = aActiveChannelList[iCh];
-  oRenameItem.value = oCh.cname ? oCh.cname : oCh.name;
-  oRenameItem.dataset.chNum = iCh;
-
-  bRenameFieldActive = true;
-  var oRenameNavItem = getEl("context_menu_title");
-  if (oRenameNavItem) {
-    oRenameNavItem.innerHTML = "";
-    oRenameNavItem.appendChild(oRenameItem);
-  }
-
-  oRenameItem.onblur = function () {
-    renameChannel();
-  };
-  oRenameItem.focus();
-}
-
-function renameChannel() {
-  if (!oRenameItem) {
-    hideRenameInput();
-    return;
-  }
-  if (!bRenameFieldActive) {
-    return;
-  }
-
-  var sNewName = oRenameItem.value,
-    iCh = oRenameItem.dataset.chNum,
-    oCh = aActiveChannelList[iCh];
-  if (!sNewName) {
-    sNewName = oCh.name;
-  }
-
-  if (sNewName && oCh && sNewName !== oCh.cname) {
-    oCh.cname = sNewName;
-    saveChannel(oCh);
-    //getEl('context_menu_title').innerText = sNewName;
-    iCh = parseInt(iCh);
-
-    bChannelNameGenerated = false;
-    bNeedNavRefresh = true;
-    if (iCh === iCurrentChannel) {
-      sCurrentChannelName = sNewName;
-    }
-    recreateNavChannel(iCh);
-  }
-
-  hideRenameInput(sNewName);
-}
-
-function hideRenameInput(sNewName) {
-  defocus();
-
-  oRenameItem = false;
-
-  if (sNewName) {
-    getEl("context_menu_title").innerText = sNewName;
-  }
-
-  bRenameFieldActive = false;
-  //getEl('context-rename').innerText = getLang('context-rename');
-}
-
-var sProtectionPassword = false,
-  sProtectionInputActive = false;
-function checkProtectionPw(sInput) {
-  if (sProtectionPassword && sInput == sProtectionPassword) {
-    toggleProtectionLock(true);
-    switch (sProtectionInputActive) {
-      case "channelload":
-        loadAndPlayChannelUrl();
-        break;
-      case "toggle":
-        if (bGroupsOpened) {
-          //hideGroups();
-          //showNav();
-        }
-        break;
-      default:
-    }
-
-    hideProtectionInput();
-  }
-}
-
-function showProtectionInput(sOrigin) {
-  if (!isPremiumAccessAllowed()) {
-    showModal(getLang("license-fail"));
-    return false;
-  }
-
-  if (!sProtectionPassword) {
-    showModal(getLang("no-password-yet"));
-    return false;
-  }
-
-  if (iChannelNameTimer) {
-    clearTimeout(iChannelNameTimer); // Let the channel info opened
-  }
-
-  sProtectionInputActive = sOrigin;
-
-  var oPasswordConfirmInput = getEl("password_confirm_input");
-  oPasswordConfirmInput.value = "";
-  showElement("password_confirm");
-  //oPasswordConfirmInput.focus();
-}
-
-function hideProtectionInput() {
-  if (sProtectionInputActive !== false) {
-    sProtectionInputActive = false;
-    hideElement("password_confirm");
-  }
-}
-
-function toggleProtectionLock(bForceUnlock) {
-  if (!bForceUnlock && !bProtectionUnlocked) {
-    showProtectionInput("toggle");
-    return;
-  }
-
-  if (bForceUnlock) {
-    bProtectionUnlocked = true;
-  } else {
-    bProtectionUnlocked = !bProtectionUnlocked;
-  }
-
-  body.classList.toggle("unlocked", bProtectionUnlocked);
-  localStorage.setItem("channelProtection", bProtectionUnlocked);
-
-  bNeedNavRefresh = true;
-
-  if (bHideProtected && bProtectionUnlocked && bNavOpened) {
-    //selectNavChannel(iContextMenuEditChannel);
-    showNav();
-    if (bGroupsOpened) {
-      hideGroups();
-    }
-  }
-}
-
-function toggleDebugger() {
-  if (bDebuggerEnabled) {
-    if (bDebuggerActive) {
-      hideElement("debugger");
-    } else {
-      showElement("debugger");
-    }
-    bDebuggerActive = !bDebuggerActive;
-  }
-}
-
-function searchChannels(sInput) {
-  sFilter = sInput.toLowerCase();
-  //oChannelList.scrollTop = 0;
-  buildNav();
-  return true;
-}
-
-function absoluteOffset(el) {
-  var rect = el.getBoundingClientRect(),
-    scrollLeft = window.pageXOffset || document.documentElement.scrollLeft,
-    scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-  return { top: rect.top + scrollTop, left: rect.left + scrollLeft };
-}
-
-function bootEverything() {
-  bIsBooting = true;
-
-  if (!isReadyForPlay()) {
-    openSettings();
-    return false;
-  }
-
-  try {
-    boot();
-  } catch (e) {
-    debugError(e);
-  }
-
-  var iResizeTimeout = false;
-  window.addEventListener("resize", function () {
-    if (bNavOpened) {
-      clearTimeout(iResizeTimeout);
-      iResizeTimeout = setTimeout(channelScrollEvent, 100);
-    }
-  });
-
-  bIsBooting = false;
-}
-
-// moved to index.php
-//window.onload = bootEverything;
-
-/*
-window.addEventListener('appcontrol', function onAppControl() {
-	var reqAppControl = tizen.application.getCurrentApplication.getRequestedAppControl();
-	if (reqAppControl) {
-		debug('appcontrol!');
-	}
-	debug('appcontrol2');
-});
-*/
-
-var bAllowAds = true,
-  bRewarded = false,
-  bAdPreparationStarted = false,
-  bAdReady = false;
-function setAdOnChannelSwitch() {
-  bAdReady = false;
-  bShowAd = true;
-}
-
-function prepareAd() {
-  bRewarded = false;
-  bAdPreparationStarted = true;
-
-  if (typeof remotePrepareAd === "function") {
-    remotePrepareAd();
-    return true;
-  }
-
-  if (bAllowAds) {
-    if (
-      sDeviceFamily === "Android" &&
-      typeof m3uConnector.prepareAdmobAd === "function"
-    ) {
-      m3uConnector.prepareAdmobAd();
-      return true;
-    }
-  }
-}
-
-function adPrepared() {
-  bAdReady = true;
-  getEl("play_ad_button").classList.remove("ad-loading");
-}
-
-function adRewarded() {
-  bRewarded = true;
-  if (typeof remoteAdRewarded === "function") {
-    remoteAdRewarded();
-    return true;
-  }
-}
-
-function onAdImpression() {
-  if (typeof remoteOnAdImpression === "function") {
-    remoteOnAdImpression();
-  }
-}
-
-function showRewardedAdConsent() {
-  bAdConsentOpened = true;
-  getEl("play_ad_button").classList.add("ad-loading");
-  document.body.classList.add("ad-consent");
-  hideChannelName();
-  prepareAd();
-}
-
-function hideRewardedAdConsent() {
-  bAdConsentOpened = false;
-  document.body.classList.remove("ad-consent");
-}
-
-function stopAdsPremium() {
-  hideRewardedAdConsent();
-  disableAdsPremium();
-  adFinishCallback();
-  pickPlaylistSelector(oPlaylistNavSelector.firstElementChild, true);
-
-  if (typeof remoteStopAdsPremium === "function") {
-    remoteStopAdsPremium();
-  }
-}
-
-function playAd() {
-  if (!bAdReady) {
-    showModal(getLang("adNotReadyYet"));
-    return false;
-  }
-
-  hideRewardedAdConsent();
-
-  if (typeof remotePlayAd === "function") {
-    remotePlayAd();
-    return true;
-  }
-
-  if (bAllowAds) {
-    if (
-      sDeviceFamily === "Android" &&
-      typeof m3uConnector.displayAdmobAd === "function"
-    ) {
-      m3uConnector.displayAdmobAd();
-      return true;
-    }
-  }
-
-  // Fallback = no add
-  adWasCanceled(
-    "The ad server is currently unavailable. Please try again later."
-  );
-}
-
-function adFinishCallback() {
-  bShowAd = false;
-  showChannelName();
-  loadAndPlayChannelUrl();
-
-  if (typeof remoteAdFinishCallback === "function") {
-    remoteAdFinishCallback();
-  }
-}
-
-function adWasCanceled(sReason) {
-  hideRewardedAdConsent();
-  disableAdsPremium();
-  bShowAd = false;
-  showModal(
-    "Ad Premium was aborted. Reason: " +
-      sReason +
-      ". To proceed, please activate Ads Premium again in the settings."
-  );
-  adFinishCallback();
-
-  if (typeof remoteAdCanceled === "function") {
-    remoteAdCanceled(sReason);
-  }
-}
-
-function consentErrorCallback(sReason) {
-  adWasCanceled(sReason);
-  if (typeof remoteConsentErrorCallback === "function") {
-    remoteConsentErrorCallback(sReason);
-  }
-}
-
-function isReadyForPlay() {
-  return localStorage.getItem("bReadyForPlay") === "1";
-}
-
-function bootPlayerView() {
-  applyLang();
-  bootEverything();
-}
-
-function premiumTrialEnded() {
-  if (
-    AppSettings.getSetting("license-type") === "Premium" ||
-    !aLoadedPlaylists
-  ) {
-    return false;
-  }
-
-  // Check playlist
-  var iFirstPlaylistId = parseInt(Object.keys(aLoadedPlaylists)[0]);
-
-  if (iCurrentPlaylistId != iFirstPlaylistId) {
-    //iCurrentPlaylistId = iFirstPlaylistId;
-    showModal(getLang("free-trial-ended"));
-    return true;
-  }
-
-  if (aArchiveData) {
-    showModal(getLang("free-trial-ended"));
-    return true;
-  }
-
-  return false;
-}
-
-function clockTimer() {
-  var oDateNow = new Date();
-  var sTime = getTimeString(oDateNow, {
-    hour: "2-digit",
-    minute: "2-digit",
-    //second: '2-digit'
-  });
-  //oEpgClock.innerHTML = sTime;
-  oClock.innerHTML = sTime;
-}
-
-function initClock() {
-  if (AppSettings.isActive("clock-always-visible")) {
-    oClock.classList.add("force-visible");
-  }
-
-  switch (AppSettings.getSetting("clock-position")) {
-    case "Bottom Left":
-      oClock.classList.add("bottom-left");
-      break;
-    case "Top Left":
-      oClock.classList.add("top-left");
-      break;
-    case "Bottom Right":
-      oClock.classList.add("bottom-right");
-      break;
-    case "Top Right":
-    default:
-      oClock.classList.add("top-right");
-  }
-
-  var sClockSize = AppSettings.getSetting("clock-size");
-  if (sClockSize) {
-    oClock.style.fontSize = sClockSize;
-  }
-
-  var bIsPremiumLicense = getLicenseType() === "Premium";
-  if (!bIsPremiumLicense) {
-    iTrialSecondsLeft = localStorage.getItem("iTrialPremiumTime");
-    iSecondsUntilAd = localStorage.getItem("iSecondsUntilAd");
-
-    if (iTrialSecondsLeft) {
-      iTrialSecondsLeft = parseInt(iTrialSecondsLeft);
-    } else {
-      iTrialSecondsLeft = 0;
-    }
-
-    if (iSecondsUntilAd) {
-      iSecondsUntilAd = parseInt(iSecondsUntilAd);
-    } else {
-      iSecondsUntilAd = 5;
-    }
-  }
-
-  clockTimer();
-  setInterval(function () {
-    clockTimer();
-
-    if (!bIsPremiumLicense && !bShowAd) {
-      if (bAdsPremiumActive) {
-        if (iSecondsUntilAd < 1) {
-          iSecondsUntilAd = 3600;
-          //prepareAd();
-          setAdOnChannelSwitch();
-        } else {
-          iSecondsUntilAd -= 5;
-          localStorage.setItem("iSecondsUntilAd", iSecondsUntilAd);
-        }
-      } else if (iTrialSecondsLeft > 0) {
-        iTrialSecondsLeft -= 5;
-
-        if (iTrialSecondsLeft > 0) {
-          localStorage.setItem("iTrialPremiumTime", iTrialSecondsLeft);
-        } else {
-          if (premiumTrialEnded()) {
-            //setActivePlaylist(iCurrentPlaylistId);
-            pickPlaylistSelector(oPlaylistNavSelector.firstElementChild, true);
-          }
-          localStorage.removeItem("iTrialPremiumTime");
-          iTrialSecondsLeft = 0;
-        }
-      }
-    }
-
-    iSecondsSinceEpgNavListRefresh += 5;
-    iSecondsSinceEpgOverviewRefresh += 5;
-    iSecondsSinceEpgChannelRefresh += 5;
-    // Wenn Übersicht geöffnet, dann jede Minute Tabelle aktualisieren
-    /*if( bEpgOverviewOpened && iSecondsSinceEpgOverviewRefresh > 120 ) {
-			refreshEpgOverviewTable();
-		}*/
-
-    if (
-      bNavOpened &&
-      (iSecondsSinceEpgNavListRefresh > 60 || bEpgDownloadRunning)
-    ) {
-      refreshEpgNavList();
-    }
-
-    if (sLoadingFromDb && iSecondsSinceEpgChannelRefresh > 15) {
-      //sLoadingFromDb = false;
-      iSecondsSinceEpgChannelRefresh = 0;
-      updateChannelNameEpg();
-    }
-  }, 5000);
-
-  // Archive
-  setInterval(function () {
-    iUtcArchiveStarted++;
-    iArchiveCurrentTime++;
-  }, 1000);
-}
